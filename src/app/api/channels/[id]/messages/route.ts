@@ -39,14 +39,15 @@ export async function POST(
 
   if (!userId) return NextResponse.json({ error: "Session invalid" }, { status: 401 });
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const [user, channel] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
+    prisma.channel.findUnique({ where: { id: channelId } }),
+  ]);
   if (!user)
     return NextResponse.json(
       { error: "Your account was not found. Please log out and log in again." },
       { status: 401 }
     );
-
-  const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   if (channel.type === "announcement" && !["Admin", "Manager"].includes(role))
     return NextResponse.json({ error: "Only Admin/Manager can post in announcement channels" }, { status: 403 });

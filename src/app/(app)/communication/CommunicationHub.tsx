@@ -801,6 +801,18 @@ function ChannelChat({
     setUploadError(null);
     setSendingMessage(true);
     const content = input.trim() || "(attachment)";
+    const tempId = `temp-${Date.now()}`;
+    const optimisticSender = { id: currentUser.id, name: currentUser.name, email: currentUser.email };
+    const optimisticMsg: MessageType = {
+      id: tempId,
+      content,
+      createdAt: new Date(),
+      updatedAt: null,
+      sender: optimisticSender,
+      attachments: [],
+    };
+    setInput("");
+    setMessages((prev) => [...prev, optimisticMsg]);
     try {
       const res = await fetch(`/api/channels/${channel.id}/messages`, {
         method: "POST",
@@ -809,6 +821,7 @@ function ChannelChat({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setUploadError(data.error || `Failed to send (${res.status})`);
         return;
       }
@@ -823,9 +836,8 @@ function ChannelChat({
           setUploadError(errMsg);
         }
       }
-      setMessages((prev) => [...prev, { ...msg, attachments: confirmed }]);
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...msg, attachments: confirmed } : m)));
       setPendingAttachments([]);
-      setInput("");
     } finally {
       setSendingMessage(false);
     }
