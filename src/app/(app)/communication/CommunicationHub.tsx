@@ -729,6 +729,7 @@ function ChannelChat({
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const CHAT_ACCEPT = "image/png,image/jpeg,image/webp,video/mp4,application/pdf";
 
@@ -764,28 +765,38 @@ function ChannelChat({
   const sendMessage = async () => {
     if (isAnnouncementOnly) return;
     if (!input.trim() && pendingAttachments.length === 0) return;
-    const content = input.trim() || "(attachment)";
-    const res = await fetch(`/api/channels/${channel.id}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
-    if (!res.ok) return;
-    const msg = await res.json();
-    const confirmed: { id: string; fileName: string; mimeType: string; sizeBytes: number }[] = [];
-    for (const p of pendingAttachments) {
-      try {
-        const m = await confirmAttachment(p, { type: "message", id: msg.id });
-        confirmed.push(m);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to attach file";
-        setUploadError(message);
-      }
-    }
-    setMessages((prev) => [...prev, { ...msg, attachments: confirmed }]);
-    setPendingAttachments([]);
-    setInput("");
+    if (sendingMessage) return;
     setUploadError(null);
+    setSendingMessage(true);
+    const content = input.trim() || "(attachment)";
+    try {
+      const res = await fetch(`/api/channels/${channel.id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setUploadError(data.error || `Failed to send (${res.status})`);
+        return;
+      }
+      const msg = data;
+      const confirmed: { id: string; fileName: string; mimeType: string; sizeBytes: number }[] = [];
+      for (const p of pendingAttachments) {
+        try {
+          const m = await confirmAttachment(p, { type: "message", id: msg.id });
+          confirmed.push(m);
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : "Failed to attach file";
+          setUploadError(errMsg);
+        }
+      }
+      setMessages((prev) => [...prev, { ...msg, attachments: confirmed }]);
+      setPendingAttachments([]);
+      setInput("");
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   const handleAttachFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -970,14 +981,18 @@ function ChannelChat({
                   onChange={setInput}
                   placeholder="Type a message… (use @ to mention)"
                   channelMembers={channelDetail?.members?.map((m) => m.user) ?? []}
-                  disabled={false}
+                  disabled={sendingMessage}
                 />
                 <button
                   type="submit"
-                  disabled={(!input.trim() && pendingAttachments.length === 0) || uploadingFile}
+                  disabled={(!input.trim() && pendingAttachments.length === 0) || uploadingFile || sendingMessage}
                   className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 shrink-0"
                 >
-                  <Send className="h-4 w-4" />
+                  {sendingMessage ? (
+                    <span className="text-sm">Sending…</span>
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </button>
               </div>
             </form>
