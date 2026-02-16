@@ -65,12 +65,14 @@ export function CommunicationHub({
   users,
   currentUser,
   canCreateChannel,
+  canManageChannelsAndCategories,
   isAdmin,
 }: {
   channelCategories: ChannelCategory[];
   users: User[];
   currentUser: { id: string; name: string; email: string; role: string };
   canCreateChannel: boolean;
+  canManageChannelsAndCategories: boolean;
   isAdmin: boolean;
 }) {
   const [view, setView] = useState<"channel" | "dm">("channel");
@@ -152,7 +154,7 @@ export function CommunicationHub({
                   )}
                   <span className="truncate">{cat.name}</span>
                 </button>
-                {isAdmin && cat.id !== "__uncategorized__" && (
+                {canManageChannelsAndCategories && cat.id !== "__uncategorized__" && (
                   <>
                     <button
                       type="button"
@@ -207,7 +209,7 @@ export function CommunicationHub({
                           </span>
                         )}
                       </button>
-                      {isAdmin && (
+                      {canManageChannelsAndCategories && (
                         <>
                           <button
                             type="button"
@@ -238,7 +240,7 @@ export function CommunicationHub({
             </div>
           ))}
 
-          {isAdmin && (
+          {canManageChannelsAndCategories && (
             <button
               type="button"
               onClick={() => setAddingCategory(true)}
@@ -335,7 +337,7 @@ export function CommunicationHub({
             isAnnouncementOnly={selectedChannel.type === "announcement" && !["Admin", "Manager"].includes(currentUser.role)}
             rightPanel={rightPanel}
             setRightPanel={setRightPanel}
-            isAdmin={isAdmin}
+            canManageChannel={canManageChannelsAndCategories}
             canAddMembers={canCreateChannel}
             workspaceUsers={users}
             onEditChannel={setEditingChannel}
@@ -690,7 +692,7 @@ function ChannelChat({
   isAnnouncementOnly,
   rightPanel,
   setRightPanel,
-  isAdmin,
+  canManageChannel,
   canAddMembers,
   workspaceUsers,
   onEditChannel,
@@ -701,7 +703,7 @@ function ChannelChat({
   isAnnouncementOnly: boolean;
   rightPanel: string | null;
   setRightPanel: (v: "info" | "members" | "pinned" | null) => void;
-  isAdmin?: boolean;
+  canManageChannel?: boolean;
   canAddMembers?: boolean;
   workspaceUsers?: User[];
   onEditChannel?: (channel: Channel) => void;
@@ -981,7 +983,7 @@ function ChannelChat({
                 <p className="text-xs text-[var(--text-muted)]">
                   {channel.type === "announcement" ? "Announcement channel" : channel.visibility}
                 </p>
-                {isAdmin && onEditChannel && (
+                {canManageChannel && onEditChannel && (
                   <button
                     type="button"
                     onClick={() => onEditChannel(channel)}
@@ -990,7 +992,7 @@ function ChannelChat({
                     <Pencil className="h-4 w-4" /> Edit channel
                   </button>
                 )}
-                {isAdmin && onChannelDeleted && (
+                {canManageChannel && onChannelDeleted && (
                   <button
                     type="button"
                     onClick={async () => {

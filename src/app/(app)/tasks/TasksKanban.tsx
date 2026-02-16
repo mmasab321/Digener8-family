@@ -150,7 +150,7 @@ export function TasksKanban({
                 </span>
               </h3>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
               {filter(col.tasks).map((task) => (
                 <div
                   key={task.id}
@@ -173,6 +173,7 @@ export function TasksKanban({
                       <Link
                         href={`/tasks/${task.id}`}
                         className="font-medium text-white hover:underline block truncate"
+                        draggable={false}
                       >
                         {task.title}
                       </Link>

@@ -9,6 +9,7 @@ export default async function CommunicationPage() {
   const userRole = (session?.user as { role?: string })?.role ?? "";
   const isAdmin = userRole === "Admin";
   const canCreateChannel = true;
+  const canManageChannelsAndCategories = true;
 
   const [channelCategoriesRaw, uncategorizedChannels, users] = await Promise.all([
     prisma.channelCategory.findMany({
@@ -93,6 +94,7 @@ export default async function CommunicationPage() {
           role: userRole,
         }}
         canCreateChannel={canCreateChannel}
+        canManageChannelsAndCategories={canManageChannelsAndCategories}
         isAdmin={isAdmin}
       />
     </div>

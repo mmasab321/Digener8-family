@@ -1,7 +1,6 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { hasPermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
@@ -10,9 +9,6 @@ export async function PATCH(
 ) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const role = (session.user as { role?: string }).role ?? "";
-  if (!hasPermission(role, "admin:channels"))
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
   const category = await prisma.channelCategory.findUnique({ where: { id } });
   if (!category) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -40,9 +36,6 @@ export async function DELETE(
 ) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const role = (session.user as { role?: string }).role ?? "";
-  if (!hasPermission(role, "admin:channels"))
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
   await prisma.channelCategory.delete({ where: { id } });
   return NextResponse.json({ ok: true });
