@@ -195,7 +195,7 @@ export function AppShell({
             </div>
             <button
               type="button"
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => signOut({ callbackUrl: `${typeof window !== "undefined" ? window.location.origin : ""}/login` })}
               className="p-2.5 rounded-xl hover:bg-[var(--bg-elevated)] text-[var(--text-muted)]"
               aria-label="Log out"
             >
