@@ -33,6 +33,8 @@ export function TasksKanban({
   const [filterUser, setFilterUser] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dropTargetColId, setDropTargetColId] = useState<string | null>(null);
 
   const filter = (tasks: Task[]) => {
     return tasks.filter((t) => {
@@ -47,12 +49,38 @@ export function TasksKanban({
     t.status !== "Done" && t.deadline && new Date(t.deadline) < new Date(new Date().setHours(0, 0, 0, 0));
 
   async function updateStatus(taskId: string, newStatus: string) {
-    await fetch(`/api/tasks/${taskId}`, {
+    const res = await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
-    window.location.reload();
+    if (res.ok) window.location.reload();
+  }
+
+  function handleDragStart(e: React.DragEvent, taskId: string) {
+    setDraggedTaskId(taskId);
+    e.dataTransfer.setData("text/plain", taskId);
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function handleDragEnd() {
+    setDraggedTaskId(null);
+    setDropTargetColId(null);
+  }
+  function handleDragOver(e: React.DragEvent, colId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTargetColId(colId);
+  }
+  function handleDragLeave() {
+    setDropTargetColId(null);
+  }
+  function handleDrop(e: React.DragEvent, colId: string) {
+    e.preventDefault();
+    setDropTargetColId(null);
+    const taskId = e.dataTransfer.getData("text/plain");
+    if (!taskId) return;
+    setDraggedTaskId(null);
+    updateStatus(taskId, colId);
   }
 
   return (
@@ -106,7 +134,13 @@ export function TasksKanban({
         {columns.map((col) => (
           <div
             key={col.id}
-            className="flex-shrink-0 w-72 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] flex flex-col max-h-[calc(100vh-220px)]"
+            className={cn(
+              "flex-shrink-0 w-72 rounded-xl border flex flex-col max-h-[calc(100vh-220px)] transition-colors",
+              dropTargetColId === col.id ? "border-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)] bg-[var(--bg-surface)]"
+            )}
+            onDragOver={(e) => handleDragOver(e, col.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, col.id)}
           >
             <div className="p-3 border-b border-[var(--border)]">
               <h3 className="font-medium text-white">
@@ -120,11 +154,15 @@ export function TasksKanban({
               {filter(col.tasks).map((task) => (
                 <div
                   key={task.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, task.id)}
+                  onDragEnd={handleDragEnd}
                   className={cn(
-                    "rounded-lg p-3 border group",
+                    "rounded-lg p-3 border group cursor-grab active:cursor-grabbing",
                     isOverdue(task)
                       ? "bg-red-500/10 border-red-500/30 hover:border-red-500/50"
-                      : "bg-[var(--bg-elevated)] border-transparent hover:border-[var(--border)]"
+                      : "bg-[var(--bg-elevated)] border-transparent hover:border-[var(--border)]",
+                    draggedTaskId === task.id && "opacity-50"
                   )}
                 >
                   <div className="flex items-start gap-2">
@@ -179,10 +217,9 @@ export function TasksKanban({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-2 pt-2 border-t border-[var(--border)] flex gap-1">
+                  <div className="mt-2 pt-2 border-t border-[var(--border)] flex flex-wrap gap-1">
                     {columns
                       .filter((c) => c.id !== task.status)
-                      .slice(0, 3)
                       .map((c) => (
                         <button
                           key={c.id}

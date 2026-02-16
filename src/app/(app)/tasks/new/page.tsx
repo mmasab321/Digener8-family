@@ -6,8 +6,7 @@ import { TaskForm } from "../TaskForm";
 
 export default async function NewTaskPage() {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as { role?: string })?.role ?? "";
-  if (role === "Viewer") redirect("/my-tasks");
+  if (!session?.user) redirect("/login");
 
   const [users, categories] = await Promise.all([
     prisma.user.findMany({ select: { id: true, name: true, email: true }, orderBy: { name: "asc" } }),

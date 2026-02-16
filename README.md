@@ -40,7 +40,15 @@ Open [http://localhost:3000](http://localhost:3000). Sign up or use the seeded a
 
 - `DATABASE_URL` – Prisma connection (e.g. `file:./dev.db` or PostgreSQL URL)
 - `NEXTAUTH_SECRET` – Random string for session signing
-- `NEXTAUTH_URL` – App URL (e.g. `http://localhost:3000`)
+- `NEXTAUTH_URL` – App URL (e.g. `http://localhost:3000` or `https://your-app.onrender.com`)
+
+## Deploying on Render
+
+1. Set **Environment** variables: `DATABASE_URL` (e.g. `file:./prisma/data/prod.db`), `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (your Render URL).
+2. Set **Release Command** to: `npx prisma db push && npx prisma db seed`  
+   This creates the DB and seeds the default admin so you can log in.
+3. After deploy, log in with **admin@degener8.com** / **admin123**, or sign up with your own email on the live site.  
+   (Your local account does not exist on production; use the seeded admin or create a new account.)
 
 ## Design Principles
 

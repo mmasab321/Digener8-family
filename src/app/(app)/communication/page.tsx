@@ -8,7 +8,7 @@ export default async function CommunicationPage() {
   const userId = (session?.user as { id?: string })?.id;
   const userRole = (session?.user as { role?: string })?.role ?? "";
   const isAdmin = userRole === "Admin";
-  const canCreateChannel = isAdmin || userRole === "Manager";
+  const canCreateChannel = true;
 
   const [channelCategoriesRaw, uncategorizedChannels, users] = await Promise.all([
     prisma.channelCategory.findMany({

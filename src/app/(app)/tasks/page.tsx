@@ -8,8 +8,7 @@ const COLUMNS = ["Backlog", "To Do", "In Progress", "Review", "Done"];
 
 export default async function TasksPage() {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as { role?: string })?.role ?? "";
-  if (role === "Viewer") redirect("/my-tasks");
+  if (!session?.user) redirect("/login");
 
   const [tasks, users, categories] = await Promise.all([
     prisma.task.findMany({
