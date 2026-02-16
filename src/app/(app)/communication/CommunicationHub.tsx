@@ -728,6 +728,7 @@ function ChannelChat({
 
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const CHAT_ACCEPT = "image/png,image/jpeg,image/webp,video/mp4,application/pdf";
 
@@ -776,25 +777,29 @@ function ChannelChat({
       try {
         const m = await confirmAttachment(p, { type: "message", id: msg.id });
         confirmed.push(m);
-      } catch {
-        // skip failed confirm
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to attach file";
+        setUploadError(message);
       }
     }
     setMessages((prev) => [...prev, { ...msg, attachments: confirmed }]);
     setPendingAttachments([]);
     setInput("");
+    setUploadError(null);
   };
 
   const handleAttachFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || isAnnouncementOnly) return;
+    setUploadError(null);
     setUploadingFile(true);
     try {
       const pending = await uploadToWasabiOnly(file, (p) => {});
       setPendingAttachments((prev) => [...prev, pending]);
-    } catch {
-      // could set error state
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setUploadError(message);
     } finally {
       setUploadingFile(false);
     }
@@ -929,6 +934,18 @@ function ChannelChat({
                     </span>
                   ))}
                 </div>
+              )}
+              {uploadError && (
+                <p className="text-sm text-red-400 px-1 py-0.5">
+                  {uploadError}
+                  <button
+                    type="button"
+                    onClick={() => setUploadError(null)}
+                    className="ml-2 underline"
+                  >
+                    Dismiss
+                  </button>
+                </p>
               )}
               <div className="flex gap-2">
                 <input
