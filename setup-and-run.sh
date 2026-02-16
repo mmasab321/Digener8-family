@@ -8,8 +8,8 @@ npm install
 echo "Generating Prisma client..."
 npx prisma generate
 
-echo "Pushing database schema..."
-npx prisma db push
+echo "Applying migrations (or use 'npx prisma db push' for fresh local DB)..."
+npx prisma migrate deploy 2>/dev/null || npx prisma db push
 
 echo "Seeding database..."
 npm run db:seed

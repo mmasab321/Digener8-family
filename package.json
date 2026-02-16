@@ -4,13 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma generate && prisma db push && next build",
+    "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
-    "start:render": "prisma db push && prisma db seed && next start",
     "lint": "next lint",
+    "migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
-    "db:deploy": "prisma db push && prisma db seed",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio"

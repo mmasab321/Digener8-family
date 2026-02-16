@@ -17,16 +17,16 @@ Internal web-based operating system for Degener8. Category-driven, modular, and 
 
 - Next.js 15 (App Router), React 19, TypeScript
 - Tailwind CSS, dark theme
-- Prisma + SQLite (default; can switch to PostgreSQL via `DATABASE_URL`)
+- Prisma + PostgreSQL (production); use `DATABASE_URL` for connection
 - NextAuth.js (credentials)
 
-## Setup
+## Setup (local)
 
 ```bash
 npm install
-cp .env.example .env   # or use the provided .env
+cp .env.example .env   # set DATABASE_URL to your PostgreSQL URL (e.g. Render Postgres or local)
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy   # or npx prisma db push for a fresh local DB
 npm run db:seed
 npm run dev
 ```
@@ -38,17 +38,18 @@ Open [http://localhost:3000](http://localhost:3000). Sign up or use the seeded a
 
 ## Environment
 
-- `DATABASE_URL` – Prisma connection (e.g. `file:./dev.db` or PostgreSQL URL)
+- `DATABASE_URL` – PostgreSQL connection string (required). Use your Render Postgres URL in production; for local dev use the same or a local Postgres instance.
 - `NEXTAUTH_SECRET` – Random string for session signing
 - `NEXTAUTH_URL` – App URL (e.g. `http://localhost:3000` or `https://your-app.onrender.com`)
 
-## Deploying on Render
+## Deploying on Render (PostgreSQL)
 
-1. Set **Environment** variables: `DATABASE_URL` (e.g. `file:./prisma/data/prod.db`), `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (your Render URL).
-2. Set **Release Command** to: `npx prisma db push && npx prisma db seed`  
-   This creates the DB and seeds the default admin so you can log in.
-3. After deploy, log in with **admin@degener8.com** / **admin123**, or sign up with your own email on the live site.  
-   (Your local account does not exist on production; use the seeded admin or create a new account.)
+1. **Environment**: Set `DATABASE_URL` to your Render Postgres **internal** URL, `NEXTAUTH_SECRET`, and `NEXTAUTH_URL` (e.g. `https://your-app.onrender.com`).
+2. **Build command**: `npm install && npx prisma migrate deploy && npm run build`  
+   Migrations run during build; no data is wiped. The first deploy applies `prisma/migrations/20260216000000_init_postgres`.
+3. **Start command**: `npm start`  
+   The app does not run migrations or seed on startup.
+4. **Seed (one-time, optional)**: On a fresh database, run `npm run db:seed` once (e.g. via Render Shell or locally with production `DATABASE_URL`) to create the default admin. Do not run seed in the start command.
 
 ## Design Principles
 
