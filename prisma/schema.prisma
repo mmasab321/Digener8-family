@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ AUTH & USERS ============
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String?
+  image         String?
+  roleId        String    @map("role_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  role          Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  accounts      Account[]
+  sessions      Session[]
+  assignedTasks Task[]
+  pipelineItems PipelineItem[]
+  metricEntries MetricEntry[]
+  messagesSent  Message[] @relation("MessageSender")
+  channelMemberships ChannelMember[]
+  directMessageParticipants DirectMessageParticipant[]
+  dmMessagesSent DirectMessageContent[] @relation("DMSender")
+  sopAuthors    SOP[]     @relation("SOPAuthor")
+  activityLogs  ActivityLog[]
+  dashboardWidgets DashboardWidget[]
+  mediaUploaded  Media[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique  // Admin, Manager, Contributor, Viewer
+  permissions String   // JSON array of permission keys
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  users User[]
+}
+
+// ============ CATEGORIES (CORE) ============
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  color       String?  // hex for UI
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tasks         Task[]
+  metrics       Metric[]
+  pipelineItems PipelineItem[]
+  pipelines     Pipeline[]
+  sops          SOP[]
+}
+
+// ============ TASKS ============
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    // Backlog, To Do, In Progress, Review, Done
+  priority    String    // Low, Medium, High, Urgent
+  assignedToId String?  @map("assigned_to_id")
+  categoryId  String?   @map("category_id")
+  metricId    String?   @map("metric_id")
+  deadline    DateTime?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  assignedTo User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  metric     Metric?   @relation(fields: [metricId], references: [id], onDelete: SetNull)
+  attachments Media[]
+}
+
+// ============ METRICS (DYNAMIC KPI ENGINE) ============
+model Metric {
+  id          String   @id @default(cuid())
+  name        String
+  categoryId  String?  @map("category_id")
+  valueType   String   @map("value_type")   // Number, Percentage, Currency
+  frequency   String   // Daily, Weekly, Monthly
+  targetValue Float?   @map("target_value")
+  apiReady    Boolean  @default(false) @map("api_ready")
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category   Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  entries    MetricEntry[]
+  tasks      Task[]
+}
+
+model MetricEntry {
+  id        String   @id @default(cuid())
+  metricId  String   @map("metric_id")
+  value     Float
+  periodStart DateTime @map("period_start") // start of day/week/month
+  enteredById String? @map("entered_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  metric    Metric @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  enteredBy User?  @relation(fields: [enteredById], references: [id], onDelete: SetNull)
+}
+
+// ============ PIPELINES (GENERIC CRM) ============
+model Pipeline {
+  id          String   @id @default(cuid())
+  name        String
+  categoryId  String?  @map("category_id")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  stages   PipelineStage[]
+  items    PipelineItem[]
+}
+
+model PipelineStage {
+  id         String   @id @default(cuid())
+  pipelineId String   @map("pipeline_id")
+  name       String
+  order      Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  pipeline Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  items    PipelineItem[]
+}
+
+model PipelineItem {
+  id         String   @id @default(cuid())
+  pipelineId String   @map("pipeline_id")
+  stageId    String   @map("stage_id")
+  title      String
+  assignedToId String? @map("assigned_to_id")
+  categoryId String?  @map("category_id")
+  value      Float?
+  notes      String?
+  customFields String? @map("custom_fields") // JSON
+  order      Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  pipeline   Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stage      PipelineStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  assignedTo User?         @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  category   Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+}
+
+// ============ COMMUNICATION ============
+model ChannelCategory {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  channels Channel[]
+}
+
+model Channel {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String?  @unique
+  description      String?
+  channelCategoryId String?  @map("channel_category_id")
+  visibility       String   @default("public")   // public | private
+  type             String   @default("normal")   // normal | announcement
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  channelCategory ChannelCategory? @relation(fields: [channelCategoryId], references: [id], onDelete: SetNull)
+  members         ChannelMember[]
+  messages        Message[]
+  pinnedMessages  PinnedMessage[]
+}
+
+model ChannelMember {
+  id         String    @id @default(cuid())
+  channelId  String    @map("channel_id")
+  userId     String    @map("user_id")
+  lastReadAt DateTime? @map("last_read_at")
+  joinedAt   DateTime  @default(now()) @map("joined_at")
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  channelId      String?   @map("channel_id")
+  senderId       String    @map("sender_id")
+  content        String
+  attachmentUrl  String?   @map("attachment_url")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime? @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  channel Channel?        @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  sender  User            @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  pinned  PinnedMessage?
+  attachments Media[]
+}
+
+model Media {
+  id         String    @id @default(cuid())
+  createdAt  DateTime  @default(now()) @map("created_at")
+  uploaderId String    @map("uploader_id")
+  fileName   String    @map("file_name")
+  mimeType   String    @map("mime_type")
+  sizeBytes  Int       @map("size_bytes")
+  storageKey String    @unique @map("storage_key")
+  taskId     String?   @map("task_id")
+  messageId  String?   @map("message_id")
+
+  uploader User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  task     Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  message  Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model PinnedMessage {
+  id        String   @id @default(cuid())
+  channelId String   @map("channel_id")
+  messageId String   @unique @map("message_id")
+  pinnedById String  @map("pinned_by_id")
+  pinnedAt  DateTime @default(now()) @map("pinned_at")
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model DirectMessage {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  participants DirectMessageParticipant[]
+  messages     DirectMessageContent[]
+}
+
+model DirectMessageParticipant {
+  id         String    @id @default(cuid())
+  dmId      String   @map("dm_id")
+  userId    String   @map("user_id")
+  lastReadAt DateTime? @map("last_read_at")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  dm   DirectMessage @relation(fields: [dmId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DirectMessageContent {
+  id        String   @id @default(cuid())
+  dmId      String   @map("dm_id")
+  senderId  String?  @map("sender_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  dm     DirectMessage @relation(fields: [dmId], references: [id], onDelete: Cascade)
+  sender User?         @relation("DMSender", fields: [senderId], references: [id], onDelete: SetNull)
+}
+
+// ============ SOP VAULT ============
+model SOP {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   // rich text / markdown
+  categoryId  String?  @map("category_id")
+  authorId    String   @map("author_id")
+  tags        String?  // comma-separated or JSON
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author   User       @relation("SOPAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+// ============ ACTIVITY & DASHBOARD ============
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String   // Task, Metric, Pipeline, etc.
+  entityId  String?  @map("entity_id")
+  categoryId String? @map("category_id")
+  metadata  String?  // JSON
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model DashboardWidget {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  widgetKey String   @map("widget_key") // task_summary, metrics, activity, announcements, quick_actions
+  order     Int      @default(0)
+  config    String?  // JSON for widget-specific options (e.g. category filter)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
