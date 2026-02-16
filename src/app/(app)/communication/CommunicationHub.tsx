@@ -693,6 +693,7 @@ function ChannelChat({
   isAdmin,
   canAddMembers,
   workspaceUsers,
+  onEditChannel,
   onChannelDeleted,
 }: {
   channel: Channel & { unreadCount?: number; lastActivityAt?: Date };
