@@ -49,7 +49,7 @@ Open [http://localhost:3000](http://localhost:3000). Sign up or use the seeded a
    Migrations run during build; no data is wiped. The first deploy applies `prisma/migrations/20260216000000_init_postgres`.
 3. **Start command**: `npm start`  
    The app does not run migrations or seed on startup.
-4. **Seed (one-time, optional)**: On a fresh database, run `npm run db:seed` once (e.g. via Render Shell or locally with production `DATABASE_URL`) to create the default admin. Do not run seed in the start command.
+4. **Seed (one-time, no Shell needed)**: On a fresh database with **no users**, open **https://your-app.onrender.com/seed** (or **/api/seed**) in the browser. It will create the default admin and categories. Then log in as **admin@degener8.com** / **admin123**. (If you already have users, use Sign up or log in.)
 5. **If you get 500 when sending messages**: (a) Ensure the build command above ran so `prisma migrate deploy` created the `Message` table. (b) Use the **internal** Postgres URL from Render (not the external one). (c) If you see connection errors in logs, append `?sslmode=require` to `DATABASE_URL`.
 
 ## Design Principles

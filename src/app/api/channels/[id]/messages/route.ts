@@ -37,6 +37,15 @@ export async function POST(
 
   if (!content?.trim()) return NextResponse.json({ error: "content required" }, { status: 400 });
 
+  if (!userId) return NextResponse.json({ error: "Session invalid" }, { status: 401 });
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user)
+    return NextResponse.json(
+      { error: "Your account was not found. Please log out and log in again." },
+      { status: 401 }
+    );
+
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   if (channel.type === "announcement" && !["Admin", "Manager"].includes(role))
