@@ -42,14 +42,21 @@ export async function POST(
   if (channel.type === "announcement" && !["Admin", "Manager"].includes(role))
     return NextResponse.json({ error: "Only Admin/Manager can post in announcement channels" }, { status: 403 });
 
-  const message = await prisma.message.create({
-    data: {
-      channelId,
-      senderId: userId!,
-      content: content.trim(),
-      attachmentUrl: attachmentUrl || null,
-    },
-    include: { sender: { select: { id: true, name: true, email: true } } },
-  });
-  return NextResponse.json(message);
+  try {
+    const message = await prisma.message.create({
+      data: {
+        channelId,
+        senderId: userId!,
+        content: content.trim(),
+        attachmentUrl: attachmentUrl ?? null,
+        updatedAt: new Date(),
+      },
+      include: { sender: { select: { id: true, name: true, email: true } } },
+    });
+    return NextResponse.json(message);
+  } catch (e) {
+    console.error("Message create error:", e);
+    const msg = e instanceof Error ? e.message : "Database error";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
