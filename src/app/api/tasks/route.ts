@@ -51,6 +51,10 @@ export async function POST(req: Request) {
     },
   });
   const uid = (session.user as { id?: string }).id;
-  await logActivity(uid ?? null, "created", "Task", task.id, task.categoryId);
+  try {
+    await logActivity(uid ?? null, "created", "Task", task.id, task.categoryId);
+  } catch {
+    // Activity log is non-critical; don't fail the request
+  }
   return NextResponse.json(task);
 }

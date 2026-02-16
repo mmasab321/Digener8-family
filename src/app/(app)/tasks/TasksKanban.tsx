@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
 import { GripVertical, Calendar, User, Tag, Plus } from "lucide-react";
@@ -30,6 +31,7 @@ export function TasksKanban({
   categories: { id: string; name: string; slug: string }[];
   currentUserId?: string;
 }) {
+  const router = useRouter();
   const [filterUser, setFilterUser] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
@@ -48,13 +50,13 @@ export function TasksKanban({
   const isOverdue = (t: Task) =>
     t.status !== "Done" && t.deadline && new Date(t.deadline) < new Date(new Date().setHours(0, 0, 0, 0));
 
-  async function updateStatus(taskId: string, newStatus: string) {
-    const res = await fetch(`/api/tasks/${taskId}`, {
-      method: "PATCH",
+  async function reorderTask(taskId: string, status: string, index: number) {
+    const res = await fetch("/api/tasks/reorder", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify({ taskId, status, index }),
     });
-    if (res.ok) window.location.reload();
+    if (res.ok) router.refresh();
   }
 
   function handleDragStart(e: React.DragEvent, taskId: string) {
@@ -74,13 +76,24 @@ export function TasksKanban({
   function handleDragLeave() {
     setDropTargetColId(null);
   }
-  function handleDrop(e: React.DragEvent, colId: string) {
+  function handleDropOnColumn(e: React.DragEvent, colId: string) {
     e.preventDefault();
     setDropTargetColId(null);
     const taskId = e.dataTransfer.getData("text/plain");
     if (!taskId) return;
     setDraggedTaskId(null);
-    updateStatus(taskId, colId);
+    const col = columns.find((c) => c.id === colId);
+    const filtered = col ? filter(col.tasks) : [];
+    reorderTask(taskId, colId, filtered.length);
+  }
+  function handleDropOnCard(e: React.DragEvent, colId: string, index: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropTargetColId(null);
+    const taskId = e.dataTransfer.getData("text/plain");
+    if (!taskId) return;
+    setDraggedTaskId(null);
+    reorderTask(taskId, colId, index);
   }
 
   return (
@@ -140,7 +153,7 @@ export function TasksKanban({
             )}
             onDragOver={(e) => handleDragOver(e, col.id)}
             onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, col.id)}
+            onDrop={(e) => handleDropOnColumn(e, col.id)}
           >
             <div className="p-3 border-b border-[var(--border)]">
               <h3 className="font-medium text-white">
@@ -151,12 +164,14 @@ export function TasksKanban({
               </h3>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
-              {filter(col.tasks).map((task) => (
+              {filter(col.tasks).map((task, idx) => (
                 <div
                   key={task.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, task.id)}
                   onDragEnd={handleDragEnd}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropTargetColId(col.id); }}
+                  onDrop={(e) => handleDropOnCard(e, col.id, idx)}
                   className={cn(
                     "rounded-lg p-3 border group cursor-grab active:cursor-grabbing",
                     isOverdue(task)
@@ -225,7 +240,7 @@ export function TasksKanban({
                         <button
                           key={c.id}
                           type="button"
-                          onClick={() => updateStatus(task.id, c.id)}
+                          onClick={() => reorderTask(task.id, c.id, 0)}
                           className="text-xs text-[var(--accent)] hover:underline"
                         >
                           → {c.title}
