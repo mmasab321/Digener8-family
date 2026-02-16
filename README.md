@@ -7,9 +7,9 @@ Internal web-based operating system for Degener8. Category-driven, modular, and 
 - **Auth**: Login / Signup, role-based access (Admin, Manager, Contributor, Viewer)
 - **Dashboard**: Customizable widgets, task summary, metrics snapshot, recent activity, announcements, quick actions. Filter by category.
 - **Metrics (KPI Engine)**: Admin-defined metrics with name, category, value type (Number/Percentage/Currency), frequency (Daily/Weekly/Monthly), optional target. Log entries; trend and target indicators.
-- **Tasks**: Kanban (Backlog, To Do, In Progress, Review, Done). Assignee, category, priority, deadline, optional related metric. Filter by user/category/priority.
+- **Tasks**: Kanban (Backlog, To Do, In Progress, Review, Done). Assignee, category, priority, deadline, optional related metric. Filter by user/category/priority. You can delete tasks from the edit page. Opening a task that was assigned to you in the last 2 minutes plays a notification sound (if `public/notification.mp3` is present).
 - **Pipeline**: Generic CRM. Admin creates pipelines with custom stages. Items have title, assignee, value, category, notes. Drag between stages.
-- **Communication**: Category-based channels. Send messages; file attachment placeholder for future.
+- **Communication**: Category-based channels. Send messages; file attachment placeholder for future. When someone @mentions you in a channel, a notification sound plays (if `public/notification.mp3` is present).
 - **SOP Vault**: Documents with title, category, author, tags, rich text (markdown). Search and filter.
 - **Settings (Admin)**: Manage users (assign role), create/edit categories. Metrics and pipelines are managed from their own modules.
 
@@ -41,6 +41,8 @@ Open [http://localhost:3000](http://localhost:3000). Sign up or use the seeded a
 - `DATABASE_URL` – PostgreSQL connection string (required). Use your Render Postgres URL in production; for local dev use the same or a local Postgres instance.
 - `NEXTAUTH_SECRET` – Random string for session signing
 - `NEXTAUTH_URL` – App URL (e.g. `http://localhost:3000` or `https://your-app.onrender.com`)
+
+**Optional:** Place a sound file at `public/notification.mp3` to hear a sound when you are @mentioned in a channel message or when you open a task that was recently assigned to you.
 
 ## Deploying on Render (PostgreSQL)
 

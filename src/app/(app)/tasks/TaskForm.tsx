@@ -164,7 +164,7 @@ export function TaskForm({
           onUploaded={() => router.refresh()}
         />
       )}
-      <div className="flex gap-2 pt-4">
+      <div className="flex gap-2 pt-4 flex-wrap items-center">
         <button
           type="submit"
           disabled={loading}
@@ -178,6 +178,23 @@ export function TaskForm({
         >
           Cancel
         </Link>
+        {task && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={async () => {
+              if (!confirm("Delete this task? This cannot be undone.")) return;
+              const res = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
+              if (res.ok) {
+                router.push("/tasks");
+                router.refresh();
+              } else alert("Failed to delete");
+            }}
+            className="rounded-lg border border-red-500/50 px-4 py-2 font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50 ml-auto"
+          >
+            Delete task
+          </button>
+        )}
       </div>
     </form>
   );

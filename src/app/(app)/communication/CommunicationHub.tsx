@@ -28,6 +28,7 @@ import {
   formatBytes as formatBytesMedia,
   type PendingAttachment,
 } from "@/lib/media/upload";
+import { playNotificationSound } from "@/lib/notificationSound";
 
 type ChannelCategory = {
   id: string;
@@ -731,6 +732,8 @@ function ChannelChat({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const channelOpenedAtRef = useRef<number>(0);
+  const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
   const CHAT_ACCEPT = "image/png,image/jpeg,image/webp,video/mp4,application/pdf";
 
   const refetchChannelDetail = () => {
@@ -752,11 +755,40 @@ function ChannelChat({
         setMessages(Array.isArray(msgs) ? msgs : []);
         setPinned(Array.isArray(pinnedList) ? pinnedList : []);
         setChannelDetail(detail);
+        channelOpenedAtRef.current = Date.now();
+        notifiedMessageIdsRef.current = new Set();
         return fetch(`/api/channels/${channel.id}/read`, { method: "POST" });
       })
       .then(() => setLoading(false))
       .catch(() => setLoading(false));
   }, [channel.id]);
+
+  useEffect(() => {
+    if (!channel.id || !currentUser?.name) return;
+    const interval = setInterval(() => {
+      fetch(`/api/channels/${channel.id}/messages`)
+        .then((r) => r.json())
+        .then((msgs: MessageType[]) => {
+          if (!Array.isArray(msgs)) return;
+          const openedAt = channelOpenedAtRef.current;
+          const notified = notifiedMessageIdsRef.current;
+          const myName = (currentUser.name || "").trim();
+          const myEmail = (currentUser.email || "").trim();
+          for (const msg of msgs) {
+            const createdAt = new Date(msg.createdAt).getTime();
+            if (createdAt <= openedAt || notified.has(msg.id)) continue;
+            const content = (msg.content || "").toLowerCase();
+            const mentioned = (myName && content.includes("@" + myName.toLowerCase())) || (myEmail && content.includes("@" + myEmail.toLowerCase()));
+            if (mentioned) {
+              playNotificationSound();
+              notified.add(msg.id);
+            }
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [channel.id, currentUser?.name, currentUser?.email]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

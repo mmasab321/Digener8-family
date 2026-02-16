@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { TaskForm } from "../TaskForm";
 import { TaskReadOnly } from "../TaskReadOnly";
-import { formatDate } from "@/lib/utils";
+import { TaskAssignmentNotification } from "../TaskAssignmentNotification";
 import { ArrowLeft } from "lucide-react";
 
 export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +32,11 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="max-w-2xl">
+      <TaskAssignmentNotification
+        taskAssignedToId={task.assignedToId}
+        taskUpdatedAt={task.updatedAt}
+        currentUserId={(session?.user as { id?: string })?.id ?? null}
+      />
       <Link
         href={isViewer ? "/my-tasks" : "/tasks"}
         className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-white mb-4"
