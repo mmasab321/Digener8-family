@@ -730,6 +730,7 @@ function ChannelChat({
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadFileCount, setUploadFileCount] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -854,22 +855,46 @@ function ChannelChat({
     }
   };
 
+  const MAX_FILES_PER_UPLOAD = 10;
   const handleAttachFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const fileList = e.target.files;
     e.target.value = "";
-    if (!file || isAnnouncementOnly) return;
+    if (!fileList?.length || isAnnouncementOnly) return;
+    let files = Array.from(fileList);
+    if (files.length > MAX_FILES_PER_UPLOAD) {
+      setUploadError(`Max ${MAX_FILES_PER_UPLOAD} files at a time. Uploading first ${MAX_FILES_PER_UPLOAD}.`);
+      files = files.slice(0, MAX_FILES_PER_UPLOAD);
+    }
     setUploadError(null);
     setUploadingFile(true);
-    setUploadProgress(0);
+    if (files.length === 1) {
+      setUploadProgress(0);
+      setUploadFileCount(null);
+      try {
+        const pending = await uploadToWasabiOnly(files[0], (p) => setUploadProgress(p));
+        setPendingAttachments((prev) => [...prev, pending]);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Upload failed";
+        setUploadError(message);
+      } finally {
+        setUploadingFile(false);
+        setUploadProgress(null);
+      }
+      return;
+    }
+    setUploadFileCount(files.length);
+    setUploadProgress(null);
     try {
-      const pending = await uploadToWasabiOnly(file, (p) => setUploadProgress(p));
-      setPendingAttachments((prev) => [...prev, pending]);
+      const pendings = await Promise.all(
+        files.map((file) => uploadToWasabiOnly(file, () => {}))
+      );
+      setPendingAttachments((prev) => [...prev, ...pendings]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setUploadError(message);
     } finally {
       setUploadingFile(false);
-      setUploadProgress(null);
+      setUploadFileCount(null);
     }
   };
 
@@ -1020,6 +1045,7 @@ function ChannelChat({
                   ref={fileInputRef}
                   type="file"
                   accept={CHAT_ACCEPT}
+                  multiple
                   className="hidden"
                   onChange={handleAttachFile}
                   disabled={uploadingFile}
@@ -1029,13 +1055,18 @@ function ChannelChat({
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingFile}
                   className="p-2 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-white shrink-0"
-                  title="Attach file"
+                  title="Attach file(s) — select multiple to upload together"
                 >
                   <Paperclip className="h-5 w-5" />
                 </button>
                 {uploadingFile && uploadProgress != null && (
                   <span className="text-sm text-[var(--text-muted)] self-center">
                     Uploading… {uploadProgress}%
+                  </span>
+                )}
+                {uploadingFile && uploadFileCount != null && uploadFileCount > 1 && (
+                  <span className="text-sm text-[var(--text-muted)] self-center">
+                    Uploading {uploadFileCount} files…
                   </span>
                 )}
                 <MessageInputWithMentions
