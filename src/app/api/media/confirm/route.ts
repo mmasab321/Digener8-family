@@ -1,10 +1,8 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { authOptions } from "@/lib/auth";
 import { hasPermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { s3Client, WASABI_BUCKET } from "@/lib/storage/s3Client";
 import { UPLOAD_MAX_BYTES, isAllowedMime } from "@/lib/storage/config";
 
 async function canAttachToTask(userId: string, role: string, taskId: string): Promise<boolean> {
@@ -65,18 +63,6 @@ export async function POST(req: Request) {
     if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   } else {
     return NextResponse.json({ error: "attachTo.type must be task or message" }, { status: 400 });
-  }
-
-  if (WASABI_BUCKET) {
-    try {
-      const head = await s3Client.send(
-        new HeadObjectCommand({ Bucket: WASABI_BUCKET, Key: storageKey })
-      );
-      if (head.ContentLength !== undefined && Math.abs(head.ContentLength - size) > 1024)
-        return NextResponse.json({ error: "File size mismatch" }, { status: 400 });
-    } catch {
-      return NextResponse.json({ error: "File not found in storage" }, { status: 400 });
-    }
   }
 
   const data: {

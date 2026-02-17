@@ -729,6 +729,7 @@ function ChannelChat({
 
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -859,14 +860,16 @@ function ChannelChat({
     if (!file || isAnnouncementOnly) return;
     setUploadError(null);
     setUploadingFile(true);
+    setUploadProgress(0);
     try {
-      const pending = await uploadToWasabiOnly(file, (p) => {});
+      const pending = await uploadToWasabiOnly(file, (p) => setUploadProgress(p));
       setPendingAttachments((prev) => [...prev, pending]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setUploadError(message);
     } finally {
       setUploadingFile(false);
+      setUploadProgress(null);
     }
   };
 
@@ -1030,6 +1033,11 @@ function ChannelChat({
                 >
                   <Paperclip className="h-5 w-5" />
                 </button>
+                {uploadingFile && uploadProgress != null && (
+                  <span className="text-sm text-[var(--text-muted)] self-center">
+                    Uploading… {uploadProgress}%
+                  </span>
+                )}
                 <MessageInputWithMentions
                   value={input}
                   onChange={setInput}
