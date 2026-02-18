@@ -321,37 +321,47 @@ export function CommunicationHub({
             <p className="px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
               Direct Messages
             </p>
-            {users.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={async () => {
-                  const res = await fetch("/api/dms/find-or-create", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ otherUserId: u.id }),
-                  });
-                  const data = await res.json();
-                  if (data.id) {
-                    setView("dm");
-                    setSelectedDmId(data.id);
-                    setSelectedChannelId(null);
-                    setDms((prev) => {
-                      const existing = prev.find((d) => d.id === data.id);
-                      if (existing) return prev;
-                      return [...prev, { id: data.id, otherUser: data.otherUser, lastMessage: null, unreadCount: 0 }];
+            {users.map((u) => {
+              const dm = dms.find((d) => d.otherUser?.id === u.id);
+              const unread = dm ? (dm.unreadCount ?? 0) : 0;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={async () => {
+                    const res = await fetch("/api/dms/find-or-create", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ otherUserId: u.id }),
                     });
-                  }
-                }}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left",
-                  selectedDmId && view === "dm" ? "bg-[var(--bg-elevated)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-white"
-                )}
-              >
-                <MessageCircle className="h-4 w-4 shrink-0 opacity-70" />
-                <span className="truncate flex-1">{u.name || u.email}</span>
-              </button>
-            ))}
+                    const data = await res.json();
+                    if (data.id) {
+                      setView("dm");
+                      setSelectedDmId(data.id);
+                      setSelectedChannelId(null);
+                      setDms((prev) => {
+                        const existing = prev.find((d) => d.id === data.id);
+                        if (existing) return prev;
+                        return [...prev, { id: data.id, otherUser: data.otherUser, lastMessage: null, unreadCount: 0 }];
+                      });
+                    }
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left",
+                    selectedDmId && view === "dm" && dm?.id === selectedDmId ? "bg-[var(--bg-elevated)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-white",
+                    unread > 0 && "font-semibold text-white"
+                  )}
+                >
+                  <MessageCircle className="h-4 w-4 shrink-0 opacity-70" />
+                  <span className="truncate flex-1">{u.name || u.email}</span>
+                  {unread > 0 && (
+                    <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-xs text-white shrink-0">
+                      {unread}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </aside>
