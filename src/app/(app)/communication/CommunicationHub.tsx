@@ -771,7 +771,7 @@ function ChannelChat({
   }, [channel.id]);
 
   useEffect(() => {
-    if (!channel.id || !currentUser?.name) return;
+    if (!channel.id) return;
     const interval = setInterval(() => {
       fetch(`/api/channels/${channel.id}/messages`)
         .then((r) => r.json())
@@ -779,8 +779,8 @@ function ChannelChat({
           if (!Array.isArray(msgs)) return;
           const openedAt = channelOpenedAtRef.current;
           const notified = notifiedMessageIdsRef.current;
-          const myName = (currentUser.name || "").trim();
-          const myEmail = (currentUser.email || "").trim();
+          const myName = (currentUser?.name || "").trim();
+          const myEmail = (currentUser?.email || "").trim();
           for (const msg of msgs) {
             const createdAt = new Date(msg.createdAt).getTime();
             if (createdAt <= openedAt || notified.has(msg.id)) continue;
@@ -791,19 +791,6 @@ function ChannelChat({
               notified.add(msg.id);
             }
           }
-        })
-        .catch(() => {});
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [channel.id, currentUser?.name, currentUser?.email]);
-
-  useEffect(() => {
-    if (!channel.id) return;
-    const interval = setInterval(() => {
-      fetch(`/api/channels/${channel.id}/messages`)
-        .then((r) => r.json())
-        .then((msgs: MessageType[]) => {
-          if (!Array.isArray(msgs)) return;
           setMessages((prev) => {
             const pending = prev.filter((m) => String(m.id).startsWith("temp-"));
             const combined = [...msgs];
@@ -817,7 +804,7 @@ function ChannelChat({
         .catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
-  }, [channel.id]);
+  }, [channel.id, currentUser?.name, currentUser?.email]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
