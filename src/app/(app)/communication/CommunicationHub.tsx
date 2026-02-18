@@ -30,7 +30,6 @@ import {
   formatBytes as formatBytesMedia,
   type PendingAttachment,
 } from "@/lib/media/upload";
-import { playNotificationSound } from "@/lib/notificationSound";
 
 type ChannelCategory = {
   id: string;
@@ -88,7 +87,16 @@ export function CommunicationHub({
   const [editingCategory, setEditingCategory] = useState<ChannelCategory | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
   const router = useRouter();
-  const dmUnreadNotifiedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (selectedDmId) {
+      window.dispatchEvent(new CustomEvent("dm-opened", { detail: { dmId: selectedDmId } }));
+    }
+  }, [selectedDmId]);
+
+  useEffect(() => {
+    const channelId = view === "channel" && selectedChannelId ? selectedChannelId : null;
+    window.dispatchEvent(new CustomEvent("channel-view", { detail: { channelId } }));
+  }, [view, selectedChannelId]);
 
   useEffect(() => {
     fetch("/api/dms")
@@ -103,22 +111,12 @@ export function CommunicationHub({
         .then((r) => r.json())
         .then((list: { id: string; unreadCount: number }[]) => {
           if (!Array.isArray(list)) return;
-          const notified = dmUnreadNotifiedRef.current;
-          for (const dm of list) {
-            if ((dm.unreadCount ?? 0) > 0 && !notified.has(dm.id)) {
-              playNotificationSound();
-              notified.add(dm.id);
-            }
-          }
+          setDms(Array.isArray(list) ? list : []);
         })
         .catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (selectedDmId) dmUnreadNotifiedRef.current.delete(selectedDmId);
-  }, [selectedDmId]);
 
   const selectedChannel = channelCategories
     .flatMap((c) => c.channels)
@@ -812,7 +810,6 @@ function ChannelChat({
             const content = (msg.content || "").toLowerCase();
             const mentioned = (myName && content.includes("@" + myName.toLowerCase())) || (myEmail && content.includes("@" + myEmail.toLowerCase()));
             if (mentioned) {
-              playNotificationSound();
               notified.add(msg.id);
               continue;
             }
@@ -821,7 +818,6 @@ function ChannelChat({
               const isParentAuthor = parent?.sender?.id === myId;
               const iRepliedInThread = msgs.some((m) => m.parentId === msg.parentId && m.sender?.id === myId && m.id !== msg.id);
               if (isParentAuthor || iRepliedInThread) {
-                playNotificationSound();
                 notified.add(msg.id);
               }
             }
@@ -1601,7 +1597,6 @@ function DMChat({
             const isNewSinceOpen = !initialIds.has(msg.id);
             if (!isNewSinceOpen || notified.has(msg.id)) continue;
             if (msg.sender?.id !== currentUser.id) {
-              playNotificationSound();
               notified.add(msg.id);
             }
           }

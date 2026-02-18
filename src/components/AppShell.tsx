@@ -23,6 +23,7 @@ import {
 import { useState, useEffect } from "react";
 import { setTheme, getTheme } from "./ThemeProvider";
 import { FaviconBadge } from "./FaviconBadge";
+import { NotificationSounds } from "./NotificationSounds";
 import { unlockNotificationAudio } from "@/lib/notificationSound";
 
 const allNavItems = [
@@ -94,6 +95,7 @@ export function AppShell({
   return (
     <div className="flex h-screen bg-[var(--bg-base)] overflow-hidden">
       <FaviconBadge />
+      <NotificationSounds />
       {/* Sidebar */}
       <aside
         className={cn(
