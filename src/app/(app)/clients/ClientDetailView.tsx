@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { EditClientModal } from "./EditClientModal";
@@ -49,6 +50,8 @@ export function ClientDetailView({
   const [editClientOpen, setEditClientOpen] = useState(false);
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [editingService, setEditingService] = useState<ClientServiceRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
 
   const refreshClient = useCallback(async () => {
     const res = await fetch(`/api/clients/${initialClient.id}`);
@@ -115,6 +118,21 @@ export function ClientDetailView({
                 className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
               >
                 <Plus className="h-4 w-4" /> Add Service
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm(`Delete client "${client.name}"? This cannot be undone.`)) return;
+                  setDeleting(true);
+                  const res = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
+                  setDeleting(false);
+                  if (res.ok) router.push("/clients");
+                  else alert("Failed to delete client");
+                }}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-500/50 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" /> Delete Client
               </button>
             </div>
           )}
