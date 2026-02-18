@@ -28,42 +28,46 @@ export function NotificationSounds() {
     };
   }, []);
 
-  useEffect(() => {
-    const channelInterval = setInterval(() => {
-      const since = channelSinceRef.current;
-      channelSinceRef.current = new Date().toISOString();
-      fetch(`/api/notifications/channel-sounds?since=${encodeURIComponent(since)}`)
-        .then((r) => r.json())
-        .then((data: { items?: { id: string; channelId: string }[] }) => {
-          const items = data?.items ?? [];
-          const notified = channelNotifiedRef.current;
-          const viewingChannelId = viewingChannelIdRef.current;
-          for (const item of items) {
-            if (notified.has(item.id)) continue;
-            if (viewingChannelId && item.channelId === viewingChannelId) continue;
+  const runChannelSounds = () => {
+    const since = channelSinceRef.current;
+    channelSinceRef.current = new Date().toISOString();
+    fetch(`/api/notifications/channel-sounds?since=${encodeURIComponent(since)}`)
+      .then((r) => r.json())
+      .then((data: { items?: { id: string; channelId: string }[] }) => {
+        const items = data?.items ?? [];
+        const notified = channelNotifiedRef.current;
+        const viewingChannelId = viewingChannelIdRef.current;
+        for (const item of items) {
+          if (notified.has(item.id)) continue;
+          if (viewingChannelId && item.channelId === viewingChannelId) continue;
+          playNotificationSound();
+          notified.add(item.id);
+        }
+      })
+      .catch(() => {});
+  };
+
+  const runDmSounds = () => {
+    fetch("/api/dms")
+      .then((r) => r.json())
+      .then((list: { id: string; unreadCount: number }[]) => {
+        if (!Array.isArray(list)) return;
+        const notified = dmNotifiedRef.current;
+        for (const dm of list) {
+          if ((dm.unreadCount ?? 0) > 0 && !notified.has(dm.id)) {
             playNotificationSound();
-            notified.add(item.id);
+            notified.add(dm.id);
           }
-        })
-        .catch(() => {});
-    }, POLL_MS);
+        }
+      })
+      .catch(() => {});
+  };
 
-    const dmInterval = setInterval(() => {
-      fetch("/api/dms")
-        .then((r) => r.json())
-        .then((list: { id: string; unreadCount: number }[]) => {
-          if (!Array.isArray(list)) return;
-          const notified = dmNotifiedRef.current;
-          for (const dm of list) {
-            if ((dm.unreadCount ?? 0) > 0 && !notified.has(dm.id)) {
-              playNotificationSound();
-              notified.add(dm.id);
-            }
-          }
-        })
-        .catch(() => {});
-    }, POLL_MS);
-
+  useEffect(() => {
+    runChannelSounds();
+    runDmSounds();
+    const channelInterval = setInterval(runChannelSounds, POLL_MS);
+    const dmInterval = setInterval(runDmSounds, POLL_MS);
     return () => {
       clearInterval(channelInterval);
       clearInterval(dmInterval);

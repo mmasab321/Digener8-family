@@ -96,6 +96,9 @@ export function CommunicationHub({
   useEffect(() => {
     const channelId = view === "channel" && selectedChannelId ? selectedChannelId : null;
     window.dispatchEvent(new CustomEvent("channel-view", { detail: { channelId } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("channel-view", { detail: { channelId: null } }));
+    };
   }, [view, selectedChannelId]);
 
   useEffect(() => {
