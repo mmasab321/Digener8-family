@@ -32,6 +32,7 @@ model User {
   activityLogs  ActivityLog[]
   dashboardWidgets DashboardWidget[]
   mediaUploaded  Media[]
+  clientsManaged Client[]
 }
 
 model Account {
@@ -347,4 +348,64 @@ model DashboardWidget {
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============ CLIENTS & SERVICE CATALOG ============
+model ServiceCategory {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  order     Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  services Service[]
+}
+
+model Service {
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String   @unique
+  serviceCategoryId  String   @map("service_category_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  serviceCategory ServiceCategory @relation(fields: [serviceCategoryId], references: [id], onDelete: Restrict)
+  clientServices  ClientService[]
+}
+
+model Client {
+  id          String    @id @default(cuid())
+  name        String
+  companyName String?   @map("company_name")
+  email       String?
+  phone       String?
+  website     String?
+  country     String?
+  status      String    // Lead, Onboarding, Active, Paused, Completed
+  managerId   String?   @map("manager_id")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  manager  User?           @relation(fields: [managerId], references: [id], onDelete: SetNull)
+  services ClientService[]
+}
+
+model ClientService {
+  id          String    @id @default(cuid())
+  clientId    String    @map("client_id")
+  serviceId   String    @map("service_id")
+  billingType String    @map("billing_type")  // One-time, Monthly, Weekly
+  price       Float?
+  startDate   DateTime? @map("start_date")
+  notes       String?
+  status      String    @default("Active")    // Active, Paused, Completed
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, serviceId])
 }

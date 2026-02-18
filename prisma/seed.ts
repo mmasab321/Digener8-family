@@ -82,7 +82,72 @@ async function main() {
       update: {},
     });
   }
-  console.log("Seeded roles, categories, channel categories, and default channels.");
+  // Service catalog (Clients module) — upsert-safe
+  const serviceCategoriesData = [
+    { name: "High Performance Creative Studio", slug: "high-performance-creative-studio", order: 1 },
+    { name: "Content Growth Engines", slug: "content-growth-engines", order: 2 },
+    { name: "Digital Architecture & Web Systems", slug: "digital-architecture-web-systems", order: 3 },
+    { name: "The Autonomous Workforce", slug: "the-autonomous-workforce", order: 4 },
+  ];
+  for (const cat of serviceCategoriesData) {
+    await prisma.serviceCategory.upsert({
+      where: { slug: cat.slug },
+      create: cat,
+      update: {},
+    });
+  }
+
+  const cat01 = await prisma.serviceCategory.findUnique({ where: { slug: "high-performance-creative-studio" } });
+  const cat02 = await prisma.serviceCategory.findUnique({ where: { slug: "content-growth-engines" } });
+  const cat03 = await prisma.serviceCategory.findUnique({ where: { slug: "digital-architecture-web-systems" } });
+  const cat04 = await prisma.serviceCategory.findUnique({ where: { slug: "the-autonomous-workforce" } });
+
+  const servicesData: { name: string; slug: string; serviceCategoryId: string }[] = [];
+  if (cat01) {
+    ["Video Editing", "Graphic Designing", "Script Writing", "Social Media Management"].forEach((name, i) => {
+      servicesData.push({
+        name,
+        slug: `high-performance-creative-studio-${name.toLowerCase().replace(/\s+/g, "-")}`,
+        serviceCategoryId: cat01.id,
+      });
+    });
+  }
+  if (cat02) {
+    ["AI Content Creation", "YouTube & Social Media", "Automation", "Platform Monetization"].forEach((name, i) => {
+      servicesData.push({
+        name,
+        slug: `content-growth-engines-${name.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "and")}`,
+        serviceCategoryId: cat02.id,
+      });
+    });
+  }
+  if (cat03) {
+    ["Website Designing", "Website Development", "Digital Ecosystem Strategy"].forEach((name) => {
+      servicesData.push({
+        name,
+        slug: `digital-architecture-${name.toLowerCase().replace(/\s+/g, "-")}`,
+        serviceCategoryId: cat03.id,
+      });
+    });
+  }
+  if (cat04) {
+    ["Autonomous Chatbots", "AI Calling Agents", "Business Process Automation"].forEach((name) => {
+      servicesData.push({
+        name,
+        slug: `autonomous-workforce-${name.toLowerCase().replace(/\s+/g, "-")}`,
+        serviceCategoryId: cat04.id,
+      });
+    });
+  }
+
+  for (const svc of servicesData) {
+    await prisma.service.upsert({
+      where: { slug: svc.slug },
+      create: svc,
+      update: {},
+    });
+  }
+  console.log("Seeded roles, categories, channel categories, default channels, and service catalog.");
 }
 
 main()
