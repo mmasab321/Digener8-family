@@ -1579,7 +1579,7 @@ function DMChat({
   useEffect(() => {
     fetch(`/api/dms/${dmId}`)
       .then((r) => r.json())
-      .then((data: { messages?: { id: string }[] }) => {
+      .then((data: { otherUser: User | null; messages: { id: string; content: string; createdAt: Date; sender: User | null }[] }) => {
         setDm(data);
         const ids = new Set((data?.messages ?? []).map((m) => m.id));
         initialDmMessageIdsRef.current = ids;
