@@ -86,9 +86,24 @@ model Build {
 
   saasStage   SaasStage? @map("saas_stage")
 
+  checklistItems BuildChecklistItem[]
+
   @@index([type])
   @@index([status])
   @@index([ownerId])
+}
+
+model BuildChecklistItem {
+  id        String   @id @default(cuid())
+  buildId   String   @map("build_id")
+  build     Build    @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  title     String
+  isDone    Boolean  @default(false) @map("is_done")
+  order     Int      @default(0) @map("item_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([buildId])
 }
 
 model Account {

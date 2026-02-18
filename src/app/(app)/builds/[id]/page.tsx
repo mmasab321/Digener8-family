@@ -13,6 +13,7 @@ export default async function BuildDetailPage({ params }: { params: Promise<{ id
     where: { id },
     include: {
       owner: { select: { id: true, name: true, email: true, image: true } },
+      checklistItems: { orderBy: { order: "asc" } },
     },
   });
   if (!build) notFound();

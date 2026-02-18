@@ -15,6 +15,7 @@ export async function GET(
     where: { id },
     include: {
       owner: { select: { id: true, name: true, email: true, image: true } },
+      checklistItems: { orderBy: { order: "asc" } },
     },
   });
   if (!build) return NextResponse.json({ error: "Not found" }, { status: 404 });
