@@ -18,6 +18,8 @@ import {
   Trash2,
   Paperclip,
   X,
+  Reply,
+  CornerDownRight,
 } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -722,10 +724,13 @@ function ChannelChat({
     content: string;
     createdAt: Date;
     updatedAt: Date | null;
+    parentId?: string | null;
     sender: User;
     pinned?: boolean;
     attachments?: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
   };
+
+  const [replyingTo, setReplyingTo] = useState<MessageType | null>(null);
 
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -825,11 +830,12 @@ function ChannelChat({
     setUploadError(null);
     setSendingMessage(true);
     const content = input.trim() || "(attachment)";
+    const parentIdToSend = replyingTo?.id ?? undefined;
     try {
       const res = await fetch(`/api/channels/${channel.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, parentId: parentIdToSend }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -847,9 +853,10 @@ function ChannelChat({
           setUploadError(errMsg);
         }
       }
-      setMessages((prev) => [...prev, { ...msg, attachments: confirmed }]);
+      setMessages((prev) => [...prev, { ...msg, attachments: confirmed, parentId: parentIdToSend ?? null }]);
       setPendingAttachments([]);
       setInput("");
+      setReplyingTo(null);
     } finally {
       setSendingMessage(false);
     }
@@ -897,6 +904,15 @@ function ChannelChat({
       setUploadFileCount(null);
     }
   };
+
+  const rootMessages = messages.filter((m) => !m.parentId);
+  const repliesByParentId = messages.reduce<Record<string, MessageType[]>>((acc, m) => {
+    if (!m.parentId) return acc;
+    if (!acc[m.parentId]) acc[m.parentId] = [];
+    acc[m.parentId].push(m);
+    acc[m.parentId].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return acc;
+  }, {});
 
   const groupByDay = (msgs: MessageType[]) => {
     const groups: { date: string; messages: MessageType[] }[] = [];
@@ -974,25 +990,50 @@ function ChannelChat({
             {!loading && messages.length === 0 && (
               <p className="text-sm text-[var(--text-muted)]">No activity yet. Start the conversation.</p>
             )}
-            {!loading && groupByDay(messages).map((g) => (
+            {!loading && groupByDay(rootMessages).map((g) => (
               <div key={g.date}>
                 <p className="text-xs text-[var(--text-muted)] sticky top-0 py-1 bg-[var(--bg-surface)]">
                   {g.date}
                 </p>
                 <div className="space-y-1 mt-1">
                   {g.messages.map((m) => (
-                    <MessageBubble
-                      key={m.id}
-                      message={m}
-                      currentUserId={currentUser.id}
-                      channelId={channel.id}
-                      onEdit={() => {
-                        setMessages((prev) =>
-                          prev.map((msg) => (msg.id === m.id ? { ...msg, content: (m as { content?: string }).content ?? msg.content } : msg))
-                        );
-                      }}
-                      onDelete={() => setMessages((prev) => prev.filter((msg) => msg.id !== m.id))}
-                    />
+                    <div key={m.id}>
+                      <MessageBubble
+                        message={m}
+                        currentUserId={currentUser.id}
+                        channelId={channel.id}
+                        replies={repliesByParentId[m.id]}
+                        isReply={false}
+                        onReply={() => setReplyingTo(m)}
+                        onEdit={() => {
+                          setMessages((prev) =>
+                            prev.map((msg) => (msg.id === m.id ? { ...msg, content: (m as { content?: string }).content ?? msg.content } : msg))
+                          );
+                        }}
+                        onDelete={() => setMessages((prev) => prev.filter((msg) => msg.id !== m.id))}
+                      />
+                      {repliesByParentId[m.id]?.length ? (
+                        <div className="ml-10 mt-0.5 border-l-2 border-[var(--border)] pl-3 space-y-0.5">
+                          {repliesByParentId[m.id].map((r) => (
+                            <MessageBubble
+                              key={r.id}
+                              message={r}
+                              currentUserId={currentUser.id}
+                              channelId={channel.id}
+                              replies={[]}
+                              isReply
+                              onReply={() => setReplyingTo(r)}
+                              onEdit={() => {
+                                setMessages((prev) =>
+                                  prev.map((msg) => (msg.id === r.id ? { ...msg, content: (r as { content?: string }).content ?? msg.content } : msg))
+                                );
+                              }}
+                              onDelete={() => setMessages((prev) => prev.filter((msg) => msg.id !== r.id))}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1008,6 +1049,23 @@ function ChannelChat({
               }}
               className="p-4 border-t border-[var(--border)]"
             >
+              {replyingTo && (
+                <div className="flex items-center gap-2 mb-2 py-2 px-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-sm">
+                  <CornerDownRight className="h-4 w-4 text-[var(--accent)] shrink-0" />
+                  <span className="text-[var(--text-muted)]">
+                    Replying to <strong className="text-white">{replyingTo.sender.name || replyingTo.sender.email}</strong>
+                    {replyingTo.content.length > 50 ? `: ${replyingTo.content.slice(0, 50)}…` : `: ${replyingTo.content}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    className="ml-auto p-1 rounded hover:bg-[var(--border)] text-[var(--text-muted)]"
+                    aria-label="Cancel reply"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
               {pendingAttachments.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {pendingAttachments.map((p, i) => (
@@ -1290,6 +1348,9 @@ function MessageBubble({
   message,
   currentUserId,
   channelId,
+  replies,
+  isReply,
+  onReply,
   onEdit,
   onDelete,
 }: {
@@ -1302,6 +1363,9 @@ function MessageBubble({
   };
   currentUserId: string;
   channelId: string;
+  replies?: { id: string; content: string; createdAt: Date; sender: User }[];
+  isReply?: boolean;
+  onReply?: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -1350,13 +1414,13 @@ function MessageBubble({
   };
 
   return (
-    <div className="group flex gap-2 py-1">
-      <div className="h-8 w-8 rounded-full bg-[var(--accent-muted)] flex items-center justify-center text-sm font-medium text-[var(--accent)] shrink-0">
+    <div className={cn("group flex gap-2 py-1", isReply && "gap-1.5")}>
+      <div className={cn("rounded-full bg-[var(--accent-muted)] flex items-center justify-center text-sm font-medium text-[var(--accent)] shrink-0", isReply ? "h-6 w-6 text-xs" : "h-8 w-8")}>
         {(message.sender.name || message.sender.email || "?").slice(0, 1).toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-white">
+          <span className={cn("font-medium text-white", isReply ? "text-xs" : "text-sm")}>
             {message.sender.name || message.sender.email}
           </span>
           <span className="text-xs text-[var(--text-muted)]">
@@ -1414,45 +1478,59 @@ function MessageBubble({
                 ))}
               </div>
             )}
-            {isOwn && (
-              <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100">
+            <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 flex items-center gap-0.5">
+              {onReply && (
                 <button
                   type="button"
-                  onClick={() => setShowMenu(!showMenu)}
+                  onClick={() => onReply()}
                   className="p-1 rounded hover:bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                  title="Reply in thread"
                 >
-                  <MoreVertical className="h-4 w-4" />
+                  <Reply className="h-4 w-4" />
                 </button>
-                {showMenu && (
-                  <div className="absolute right-0 top-full mt-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] py-1 z-10 min-w-[120px]">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditing(true);
-                        setShowMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-white hover:bg-[var(--border)]"
-                    >
-                      <Pencil className="h-4 w-4" /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handlePin}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-white hover:bg-[var(--border)]"
-                    >
-                      <Pin className="h-4 w-4" /> Pin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDelete}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-red-400 hover:bg-[var(--border)]"
-                    >
-                      <Trash2 className="h-4 w-4" /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+              {isOwn && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowMenu(!showMenu)}
+                    className="p-1 rounded hover:bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {showMenu && (
+                    <div className="absolute right-0 top-full mt-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] py-1 z-10 min-w-[120px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditing(true);
+                          setShowMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-white hover:bg-[var(--border)]"
+                      >
+                        <Pencil className="h-4 w-4" /> Edit
+                      </button>
+                      {!isReply && (
+                        <button
+                          type="button"
+                          onClick={handlePin}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-white hover:bg-[var(--border)]"
+                        >
+                          <Pin className="h-4 w-4" /> Pin
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-red-400 hover:bg-[var(--border)]"
+                      >
+                        <Trash2 className="h-4 w-4" /> Delete
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

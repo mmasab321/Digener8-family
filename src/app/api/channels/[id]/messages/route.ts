@@ -33,7 +33,7 @@ export async function POST(
   const role = (session.user as { role?: string }).role ?? "";
   const { id: channelId } = await params;
   const body = await req.json();
-  const { content, attachmentUrl } = body;
+  const { content, attachmentUrl, parentId } = body;
 
   if (!content?.trim()) return NextResponse.json({ error: "content required" }, { status: 400 });
 
@@ -52,10 +52,19 @@ export async function POST(
   if (channel.type === "announcement" && !["Admin", "Manager"].includes(role))
     return NextResponse.json({ error: "Only Admin/Manager can post in announcement channels" }, { status: 403 });
 
+  let parentMessageId: string | null = null;
+  if (parentId && typeof parentId === "string") {
+    const parent = await prisma.message.findFirst({
+      where: { id: parentId, channelId, deletedAt: null },
+    });
+    if (parent) parentMessageId = parent.id;
+  }
+
   try {
     const message = await prisma.message.create({
       data: {
         channelId,
+        parentId: parentMessageId,
         senderId: userId!,
         content: content.trim(),
         attachmentUrl: attachmentUrl ?? null,
