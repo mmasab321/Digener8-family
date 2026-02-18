@@ -23,6 +23,7 @@ import {
 import { useState, useEffect } from "react";
 import { setTheme, getTheme } from "./ThemeProvider";
 import { FaviconBadge } from "./FaviconBadge";
+import { unlockNotificationAudio } from "@/lib/notificationSound";
 
 const allNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["Admin", "Manager"] },
@@ -56,6 +57,27 @@ export function AppShell({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const unlock = () => {
+      unlockNotificationAudio();
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+      document.removeEventListener("touchstart", unlock);
+      window.removeEventListener("focus", unlock);
+    };
+    document.addEventListener("click", unlock, { once: true, capture: true });
+    document.addEventListener("keydown", unlock, { once: true, capture: true });
+    document.addEventListener("touchstart", unlock, { once: true, capture: true });
+    window.addEventListener("focus", unlock, { once: true });
+    return () => {
+      document.removeEventListener("click", unlock, true);
+      document.removeEventListener("keydown", unlock, true);
+      document.removeEventListener("touchstart", unlock, true);
+      window.removeEventListener("focus", unlock);
+    };
+  }, [mounted]);
   useEffect(() => {
     setThemeState(getTheme());
   }, []);

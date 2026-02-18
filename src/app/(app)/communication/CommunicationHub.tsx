@@ -88,12 +88,36 @@ export function CommunicationHub({
   const [editingCategory, setEditingCategory] = useState<ChannelCategory | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
   const router = useRouter();
+  const dmUnreadNotifiedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/dms")
       .then((r) => r.json())
       .then((data) => setDms(Array.isArray(data) ? data : []))
       .catch(() => setDms([]));
+  }, [selectedDmId]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch("/api/dms")
+        .then((r) => r.json())
+        .then((list: { id: string; unreadCount: number }[]) => {
+          if (!Array.isArray(list)) return;
+          const notified = dmUnreadNotifiedRef.current;
+          for (const dm of list) {
+            if ((dm.unreadCount ?? 0) > 0 && !notified.has(dm.id)) {
+              playNotificationSound();
+              notified.add(dm.id);
+            }
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (selectedDmId) dmUnreadNotifiedRef.current.delete(selectedDmId);
   }, [selectedDmId]);
 
   const selectedChannel = channelCategories
@@ -1550,14 +1574,15 @@ function DMChat({
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const notifiedDmIdsRef = useRef<Set<string>>(new Set());
-  const dmOpenedAtRef = useRef<number>(0);
+  const initialDmMessageIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     fetch(`/api/dms/${dmId}`)
       .then((r) => r.json())
-      .then((data) => {
+      .then((data: { messages?: { id: string }[] }) => {
         setDm(data);
-        dmOpenedAtRef.current = Date.now();
+        const ids = new Set((data?.messages ?? []).map((m) => m.id));
+        initialDmMessageIdsRef.current = ids;
         notifiedDmIdsRef.current = new Set();
       })
       .catch(() => setDm(null));
@@ -1570,11 +1595,11 @@ function DMChat({
         .then((r) => r.json())
         .then((data: { otherUser: User | null; messages: { id: string; content: string; createdAt: Date; sender: User | null }[] }) => {
           if (!data?.messages) return;
-          const openedAt = dmOpenedAtRef.current;
+          const initialIds = initialDmMessageIdsRef.current;
           const notified = notifiedDmIdsRef.current;
           for (const msg of data.messages) {
-            const createdAt = new Date(msg.createdAt).getTime();
-            if (createdAt <= openedAt || notified.has(msg.id)) continue;
+            const isNewSinceOpen = !initialIds.has(msg.id);
+            if (!isNewSinceOpen || notified.has(msg.id)) continue;
             if (msg.sender?.id !== currentUser.id) {
               playNotificationSound();
               notified.add(msg.id);
