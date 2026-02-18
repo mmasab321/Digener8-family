@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { setTheme, getTheme } from "./ThemeProvider";
+import { FaviconBadge } from "./FaviconBadge";
 
 const allNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["Admin", "Manager"] },
@@ -70,6 +71,7 @@ export function AppShell({
 
   return (
     <div className="flex h-screen bg-[var(--bg-base)] overflow-hidden">
+      <FaviconBadge />
       {/* Sidebar */}
       <aside
         className={cn(

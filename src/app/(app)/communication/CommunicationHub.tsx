@@ -781,6 +781,7 @@ function ChannelChat({
           const notified = notifiedMessageIdsRef.current;
           const myName = (currentUser?.name || "").trim();
           const myEmail = (currentUser?.email || "").trim();
+          const myId = currentUser?.id;
           for (const msg of msgs) {
             const createdAt = new Date(msg.createdAt).getTime();
             if (createdAt <= openedAt || notified.has(msg.id)) continue;
@@ -789,6 +790,16 @@ function ChannelChat({
             if (mentioned) {
               playNotificationSound();
               notified.add(msg.id);
+              continue;
+            }
+            if (msg.parentId && myId && msg.sender?.id !== myId) {
+              const parent = msgs.find((m) => m.id === msg.parentId);
+              const isParentAuthor = parent?.sender?.id === myId;
+              const iRepliedInThread = msgs.some((m) => m.parentId === msg.parentId && m.sender?.id === myId && m.id !== msg.id);
+              if (isParentAuthor || iRepliedInThread) {
+                playNotificationSound();
+                notified.add(msg.id);
+              }
             }
           }
           setMessages((prev) => {
@@ -1538,13 +1549,43 @@ function DMChat({
   } | null>(null);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const notifiedDmIdsRef = useRef<Set<string>>(new Set());
+  const dmOpenedAtRef = useRef<number>(0);
 
   useEffect(() => {
     fetch(`/api/dms/${dmId}`)
       .then((r) => r.json())
-      .then(setDm)
+      .then((data) => {
+        setDm(data);
+        dmOpenedAtRef.current = Date.now();
+        notifiedDmIdsRef.current = new Set();
+      })
       .catch(() => setDm(null));
   }, [dmId]);
+
+  useEffect(() => {
+    if (!dmId || !currentUser?.id) return;
+    const interval = setInterval(() => {
+      fetch(`/api/dms/${dmId}`)
+        .then((r) => r.json())
+        .then((data: { otherUser: User | null; messages: { id: string; content: string; createdAt: Date; sender: User | null }[] }) => {
+          if (!data?.messages) return;
+          const openedAt = dmOpenedAtRef.current;
+          const notified = notifiedDmIdsRef.current;
+          for (const msg of data.messages) {
+            const createdAt = new Date(msg.createdAt).getTime();
+            if (createdAt <= openedAt || notified.has(msg.id)) continue;
+            if (msg.sender?.id !== currentUser.id) {
+              playNotificationSound();
+              notified.add(msg.id);
+            }
+          }
+          setDm(data);
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [dmId, currentUser?.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
