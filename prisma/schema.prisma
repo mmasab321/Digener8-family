@@ -33,6 +33,62 @@ model User {
   dashboardWidgets DashboardWidget[]
   mediaUploaded  Media[]
   clientsManaged Client[]
+  buildsOwned    Build[]
+}
+
+// ============ BUILDS (INTERNAL PROJECTS) ============
+enum BuildType {
+  YOUTUBE
+  SAAS
+}
+
+enum BuildStatus {
+  PLANNING
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum SaasStage {
+  IDEA
+  BUILDING
+  BETA
+  LIVE
+}
+
+model Build {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  name        String
+  description String?
+
+  type        BuildType
+  status      BuildStatus @default(PLANNING)
+  priority    Priority    @default(MEDIUM)
+
+  ownerId     String?   @map("owner_id")
+  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  progress    Int       @default(0) // 0..100
+  startDate   DateTime? @map("start_date")
+  targetDate  DateTime? @map("target_date")
+
+  youtubeUploadTarget   String? @map("youtube_upload_target")
+  youtubeVideosThisMonth Int?   @default(0) @map("youtube_videos_this_month")
+
+  saasStage   SaasStage? @map("saas_stage")
+
+  @@index([type])
+  @@index([status])
+  @@index([ownerId])
 }
 
 model Account {

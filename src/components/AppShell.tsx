@@ -19,6 +19,7 @@ import {
   Sun,
   Moon,
   Briefcase,
+  Box,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { setTheme, getTheme } from "./ThemeProvider";
@@ -31,6 +32,7 @@ const allNavItems = [
   { href: "/tasks", label: "Tasks", icon: CheckSquare, roles: ["Admin", "Manager", "Contributor", "Viewer"] },
   { href: "/my-tasks", label: "My Tasks", icon: ClipboardList, roles: ["Admin", "Manager", "Contributor", "Viewer"] },
   { href: "/clients", label: "Clients", icon: Briefcase, roles: ["Admin", "Manager", "Contributor", "Viewer"] },
+  { href: "/builds", label: "Builds", icon: Box, roles: ["Admin", "Manager", "Contributor", "Viewer"] },
   { href: "/communication", label: "Communication", icon: MessageSquare, roles: ["Admin", "Manager", "Contributor", "Viewer"] },
   { href: "/team", label: "Team Management", icon: Users, roles: ["Admin"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["Admin"] },
