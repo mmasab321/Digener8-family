@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { BuildType, BuildStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
   const status = searchParams.get("status")?.trim() as BuildStatus | null;
   const search = searchParams.get("search")?.trim() || "";
 
-  const where: { type?: BuildType; status?: BuildStatus; OR?: { name: { contains: string; mode: "insensitive" }; description: { contains: string; mode: "insensitive" } }[] } = {};
+  const where: Prisma.BuildWhereInput = {};
   if (type && (type === "YOUTUBE" || type === "SAAS")) where.type = type;
   if (status && ["PLANNING", "ACTIVE", "PAUSED", "COMPLETED"].includes(status)) where.status = status;
   if (search) {
