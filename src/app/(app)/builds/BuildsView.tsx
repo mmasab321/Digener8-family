@@ -21,6 +21,7 @@ type BuildRow = {
   progress: number;
   startDate: string | null;
   targetDate: string | null;
+  ownerId: string | null;
   owner: { id: string; name: string | null; email: string } | null;
   youtubeUploadTarget: string | null;
   youtubeVideosThisMonth: number | null;
