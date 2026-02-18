@@ -109,9 +109,9 @@ export function CommunicationHub({
     const interval = setInterval(() => {
       fetch("/api/dms")
         .then((r) => r.json())
-        .then((list: { id: string; unreadCount: number }[]) => {
+        .then((list: DMPreview[]) => {
           if (!Array.isArray(list)) return;
-          setDms(Array.isArray(list) ? list : []);
+          setDms(list);
         })
         .catch(() => {});
     }, 3000);
