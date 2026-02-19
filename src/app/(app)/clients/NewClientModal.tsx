@@ -477,18 +477,14 @@ export function NewClientModal({
                   )}
                 </div>
                 <input
-                  id="client-file-upload"
                   ref={fileInputRef}
                   type="file"
                   multiple
                   accept=".png,.jpg,.jpeg,.webp,.pdf,.mp4"
                   onChange={onFileSelect}
-                  className="sr-only"
-                  aria-label="Upload files"
+                  className="hidden"
                 />
-                <label
-                  htmlFor="client-file-upload"
-                  onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
+                <div
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -502,12 +498,19 @@ export function NewClientModal({
                       return next;
                     });
                   }}
-                  className="border-2 border-dashed border-[var(--border)] rounded-xl p-6 text-center cursor-pointer hover:border-[var(--accent)]/50 hover:bg-[var(--bg-elevated)]/50 transition-colors block"
+                  className="border-2 border-dashed border-[var(--border)] rounded-xl p-6 text-center hover:border-[var(--accent)]/50 hover:bg-[var(--bg-elevated)]/50 transition-colors"
                 >
                   <Upload className="h-8 w-8 mx-auto text-[var(--text-muted)] mb-2" />
-                  <p className="text-sm text-[var(--text-muted)]">Drag & drop or click to browse</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">PNG, JPEG, WebP, PDF, MP4 (same as Communication)</p>
-                </label>
+                  <p className="text-sm text-[var(--text-muted)]">Drag & drop files here, or</p>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+                  >
+                    Select files
+                  </button>
+                  <p className="text-xs text-[var(--text-muted)] mt-2">PNG, JPEG, WebP, PDF, MP4 (same as Communication)</p>
+                </div>
                 {pendingFiles.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
                     {pendingFiles.map((file, i) => (
