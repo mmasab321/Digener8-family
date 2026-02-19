@@ -45,11 +45,16 @@ export function NewClientModal({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingFilesRef = useRef<File[]>([]);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [selectedServices, setSelectedServices] = useState<Record<string, SelectedService>>({});
+
+  useEffect(() => {
+    pendingFilesRef.current = pendingFiles;
+  }, [pendingFiles]);
 
   useEffect(() => {
     Promise.all([fetch("/api/users").then((r) => r.json()), fetch("/api/services").then((r) => r.json())]).then(
@@ -95,10 +100,20 @@ export function NewClientModal({
   const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
-    setPendingFiles((prev) => [...prev, ...Array.from(files)]);
+    const newFiles = Array.from(files);
+    setPendingFiles((prev) => {
+      const next = [...prev, ...newFiles];
+      pendingFilesRef.current = next;
+      return next;
+    });
     e.target.value = ""; // allow selecting same file again
   };
-  const removePendingFile = (index: number) => setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  const removePendingFile = (index: number) =>
+    setPendingFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      pendingFilesRef.current = next;
+      return next;
+    });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,10 +161,11 @@ export function NewClientModal({
     }
     const client = await res.json();
     const clientId = client?.id;
-    const totalFiles = pendingFiles.length;
+    const filesToUpload = pendingFilesRef.current;
+    const totalFiles = filesToUpload.length;
     if (clientId && totalFiles > 0) {
-      for (let i = 0; i < pendingFiles.length; i++) {
-        const file = pendingFiles[i];
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
         try {
           setUploadStatus(`Uploading ${i + 1}/${totalFiles}…`);
           const pending = await uploadToWasabiOnly(file);
@@ -467,16 +483,24 @@ export function NewClientModal({
                   multiple
                   accept=".png,.jpg,.jpeg,.webp,.pdf,.mp4"
                   onChange={onFileSelect}
-                  className="hidden"
+                  className="sr-only"
+                  aria-label="Upload files"
                 />
                 <label
                   htmlFor="client-file-upload"
+                  onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     const files = e.dataTransfer?.files;
-                    if (files?.length) setPendingFiles((prev) => [...prev, ...Array.from(files)]);
+                    if (!files?.length) return;
+                    const newFiles = Array.from(files);
+                    setPendingFiles((prev) => {
+                      const next = [...prev, ...newFiles];
+                      pendingFilesRef.current = next;
+                      return next;
+                    });
                   }}
                   className="border-2 border-dashed border-[var(--border)] rounded-xl p-6 text-center cursor-pointer hover:border-[var(--accent)]/50 hover:bg-[var(--bg-elevated)]/50 transition-colors block"
                 >
