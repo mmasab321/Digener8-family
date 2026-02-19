@@ -461,6 +461,7 @@ export function NewClientModal({
                   )}
                 </div>
                 <input
+                  id="client-file-upload"
                   ref={fileInputRef}
                   type="file"
                   multiple
@@ -468,11 +469,8 @@ export function NewClientModal({
                   onChange={onFileSelect}
                   className="hidden"
                 />
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => fileInputRef.current?.click()}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
+                <label
+                  htmlFor="client-file-upload"
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -480,12 +478,12 @@ export function NewClientModal({
                     const files = e.dataTransfer?.files;
                     if (files?.length) setPendingFiles((prev) => [...prev, ...Array.from(files)]);
                   }}
-                  className="border-2 border-dashed border-[var(--border)] rounded-xl p-6 text-center cursor-pointer hover:border-[var(--accent)]/50 hover:bg-[var(--bg-elevated)]/50 transition-colors"
+                  className="border-2 border-dashed border-[var(--border)] rounded-xl p-6 text-center cursor-pointer hover:border-[var(--accent)]/50 hover:bg-[var(--bg-elevated)]/50 transition-colors block"
                 >
                   <Upload className="h-8 w-8 mx-auto text-[var(--text-muted)] mb-2" />
                   <p className="text-sm text-[var(--text-muted)]">Drag & drop or click to browse</p>
                   <p className="text-xs text-[var(--text-muted)] mt-1">PNG, JPEG, WebP, PDF, MP4 (same as Communication)</p>
-                </div>
+                </label>
                 {pendingFiles.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
                     {pendingFiles.map((file, i) => (
