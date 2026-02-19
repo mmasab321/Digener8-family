@@ -166,9 +166,10 @@ export function NewClientModal({
               sizeBytes: file.size,
             }),
           });
-          if (!presignRes.ok) throw new Error("Presign failed");
-          const { uploadUrl, storageKey, headers: head } = await presignRes.json();
-          await putFile(file, uploadUrl, head["Content-Type"] || file.type || "application/octet-stream");
+          const presignData = await presignRes.json().catch(() => ({}));
+          if (!presignRes.ok) throw new Error(presignData.error || "Upload setup failed");
+          const { uploadUrl, storageKey, headers: head } = presignData;
+          await putFile(file, uploadUrl, head?.["Content-Type"] || file.type || "application/octet-stream");
           const confirmRes = await fetch(`/api/clients/${clientId}/assets/confirm`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -179,7 +180,8 @@ export function NewClientModal({
               sizeBytes: file.size,
             }),
           });
-          if (!confirmRes.ok) throw new Error("Confirm failed");
+          const confirmData = await confirmRes.json().catch(() => ({}));
+          if (!confirmRes.ok) throw new Error(confirmData.error || "Save file failed");
         } catch (err) {
           setError(err instanceof Error ? err.message : "File upload failed");
           setLoading(false);
@@ -487,6 +489,7 @@ export function NewClientModal({
                 >
                   <Upload className="h-8 w-8 mx-auto text-[var(--text-muted)] mb-2" />
                   <p className="text-sm text-[var(--text-muted)]">Drag & drop or click to browse</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Files upload when you click Create Client. Allowed: images (PNG, JPEG, WebP), PDF, MP4.</p>
                 </div>
                 {pendingFiles.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
