@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Upload, X } from "lucide-react";
-import { formatBytes } from "@/lib/media/upload";
+import { formatBytes, uploadToWasabiOnly } from "@/lib/media/upload";
 
 type User = { id: string; name: string | null; email: string };
 type Service = { id: string; name: string; slug: string };
@@ -17,23 +17,6 @@ type SelectedService = {
 };
 
 type LinkRow = { id: string; label: string; url: string };
-
-function putFile(file: File, uploadUrl: string, contentType: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", uploadUrl);
-    if (contentType) xhr.setRequestHeader("Content-Type", contentType);
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) return resolve();
-      const msg = xhr.status === 0
-        ? "Upload failed (blocked or network error). If using Wasabi/S3, add CORS to your bucket: allow your site origin and method PUT."
-        : `Upload failed (status ${xhr.status}).`;
-      reject(new Error(msg));
-    };
-    xhr.onerror = () => reject(new Error("Upload failed (network error). If using Wasabi/S3, add CORS to your bucket: allow your site origin and method PUT."));
-    xhr.send(file);
-  });
-}
 
 export function NewClientModal({
   onClose,
@@ -163,27 +146,15 @@ export function NewClientModal({
     if (clientId && pendingFiles.length > 0) {
       for (const file of pendingFiles) {
         try {
-          const presignRes = await fetch(`/api/clients/${clientId}/assets/presign`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fileName: file.name,
-              mimeType: file.type || "application/octet-stream",
-              sizeBytes: file.size,
-            }),
-          });
-          const presignData = await presignRes.json().catch(() => ({}));
-          if (!presignRes.ok) throw new Error(presignData.error || "Upload setup failed");
-          const { uploadUrl, storageKey, headers: head } = presignData;
-          await putFile(file, uploadUrl, head?.["Content-Type"] || file.type || "application/octet-stream");
+          const pending = await uploadToWasabiOnly(file);
           const confirmRes = await fetch(`/api/clients/${clientId}/assets/confirm`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              storageKey,
-              fileName: file.name,
-              mimeType: file.type || "application/octet-stream",
-              sizeBytes: file.size,
+              storageKey: pending.storageKey,
+              fileName: pending.fileName,
+              mimeType: pending.mimeType,
+              sizeBytes: pending.sizeBytes,
             }),
           });
           const confirmData = await confirmRes.json().catch(() => ({}));
@@ -495,7 +466,7 @@ export function NewClientModal({
                 >
                   <Upload className="h-8 w-8 mx-auto text-[var(--text-muted)] mb-2" />
                   <p className="text-sm text-[var(--text-muted)]">Drag & drop or click to browse</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">Files upload when you click Create Client. Most file types allowed (images, PDF, video, docs, zip). If upload fails, check Wasabi CORS (see docs/wasabi-cors.md).</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Files upload when you click Create Client. Same as Communication: images (PNG, JPEG, WebP), PDF, MP4.</p>
                 </div>
                 {pendingFiles.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
