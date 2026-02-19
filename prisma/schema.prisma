@@ -34,6 +34,7 @@ model User {
   mediaUploaded  Media[]
   clientsManaged Client[]
   buildsOwned    Build[]
+  clientAssets   ClientAsset[]
 }
 
 // ============ BUILDS (INTERNAL PROJECTS) ============
@@ -464,6 +465,46 @@ model Client {
 
   manager  User?           @relation(fields: [managerId], references: [id], onDelete: SetNull)
   services ClientService[]
+  brief    ClientBrief?
+}
+
+model ClientBrief {
+  id        String   @id @default(cuid())
+  clientId  String   @unique @map("client_id")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  briefText String?  @map("brief_text")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  links ClientLink[]
+  assets ClientAsset[]
+}
+
+model ClientLink {
+  id        String   @id @default(cuid())
+  briefId   String   @map("brief_id")
+  brief     ClientBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  label     String?
+  url       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([briefId])
+}
+
+model ClientAsset {
+  id           String   @id @default(cuid())
+  briefId      String   @map("brief_id")
+  brief        ClientBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  fileName     String   @map("file_name")
+  mimeType     String?  @map("mime_type")
+  sizeBytes    Int?     @map("size_bytes")
+  storageKey   String   @map("storage_key")
+  publicUrl    String?  @map("public_url")
+  uploadedById String?  @map("uploaded_by_id")
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([briefId])
 }
 
 model ClientService {

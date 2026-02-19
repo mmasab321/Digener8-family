@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Upload, X } from "lucide-react";
+import { formatBytes } from "@/lib/media/upload";
 
 type User = { id: string; name: string | null; email: string };
 type Service = { id: string; name: string; slug: string };
@@ -14,6 +16,19 @@ type SelectedService = {
   notes: string;
 };
 
+type LinkRow = { id: string; label: string; url: string };
+
+function putFile(file: File, uploadUrl: string, contentType: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    if (contentType) xhr.setRequestHeader("Content-Type", contentType);
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Upload failed")));
+    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.send(file);
+  });
+}
+
 export function NewClientModal({
   onClose,
   onCreated,
@@ -21,7 +36,7 @@ export function NewClientModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +50,11 @@ export function NewClientModal({
   const [managerId, setManagerId] = useState("");
   const [notes, setNotes] = useState("");
 
+  const [briefText, setBriefText] = useState("");
+  const [links, setLinks] = useState<LinkRow[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [selectedServices, setSelectedServices] = useState<Record<string, SelectedService>>({});
@@ -74,10 +94,28 @@ export function NewClientModal({
     });
   };
 
+  const addLink = () => setLinks((prev) => [...prev, { id: crypto.randomUUID(), label: "", url: "" }]);
+  const removeLink = (id: string) => setLinks((prev) => prev.filter((l) => l.id !== id));
+  const updateLink = (id: string, field: "label" | "url", value: string) => {
+    setLinks((prev) => prev.map((l) => (l.id === id ? { ...l, [field]: value } : l)));
+  };
+
+  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setPendingFiles((prev) => [...prev, ...Array.from(files)]);
+    e.target.value = "";
+  };
+  const removePendingFile = (index: number) => setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1) {
       setStep(2);
+      return;
+    }
+    if (step === 2) {
+      setStep(3);
       return;
     }
     setError(null);
@@ -89,6 +127,7 @@ export function NewClientModal({
       startDate: s.startDate || null,
       notes: s.notes || null,
     }));
+    const linksPayload = links.filter((l) => l.url.trim()).map((l) => ({ label: l.label.trim() || null, url: l.url.trim() }));
     const res = await fetch("/api/clients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -103,14 +142,52 @@ export function NewClientModal({
         managerId: managerId || null,
         notes: notes.trim() || null,
         services: servicesPayload,
+        briefText: briefText.trim() || null,
+        links: linksPayload,
       }),
     });
-    setLoading(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to create client");
+      setLoading(false);
       return;
     }
+    const client = await res.json();
+    const clientId = client?.id;
+    if (clientId && pendingFiles.length > 0) {
+      for (const file of pendingFiles) {
+        try {
+          const presignRes = await fetch(`/api/clients/${clientId}/assets/presign`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: file.name,
+              mimeType: file.type || "application/octet-stream",
+              sizeBytes: file.size,
+            }),
+          });
+          if (!presignRes.ok) throw new Error("Presign failed");
+          const { uploadUrl, storageKey, headers: head } = await presignRes.json();
+          await putFile(file, uploadUrl, head["Content-Type"] || file.type || "application/octet-stream");
+          const confirmRes = await fetch(`/api/clients/${clientId}/assets/confirm`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              storageKey,
+              fileName: file.name,
+              mimeType: file.type || "application/octet-stream",
+              sizeBytes: file.size,
+            }),
+          });
+          if (!confirmRes.ok) throw new Error("Confirm failed");
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "File upload failed");
+          setLoading(false);
+          return;
+        }
+      }
+    }
+    setLoading(false);
     onCreated();
   };
 
@@ -140,6 +217,13 @@ export function NewClientModal({
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${step === 2 ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-surface)] text-[var(--text-muted)]"}`}
           >
             Step 2: Services
+          </button>
+          <button
+            type="button"
+            onClick={() => setStep(3)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${step === 3 ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-surface)] text-[var(--text-muted)]"}`}
+          >
+            Step 3: Brief & Creatives
           </button>
         </div>
 
@@ -334,6 +418,93 @@ export function NewClientModal({
             </div>
           )}
 
+          {step === 3 && (
+            <div className="space-y-4">
+              <div>
+                <label className={labelClass}>Brief</label>
+                <textarea
+                  value={briefText}
+                  onChange={(e) => setBriefText(e.target.value)}
+                  className={inputClass}
+                  rows={4}
+                  placeholder="Client brief, goals, references..."
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className={labelClass}>Reference links</label>
+                  <button type="button" onClick={addLink} className="inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)] hover:underline">
+                    <Plus className="h-3 w-3" /> Add link
+                  </button>
+                </div>
+                {links.length === 0 ? (
+                  <p className="text-sm text-[var(--text-muted)]">No links added.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {links.map((l) => (
+                      <div key={l.id} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={l.label}
+                          onChange={(e) => updateLink(l.id, "label", e.target.value)}
+                          className="flex-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)] px-3 py-2 text-sm text-[var(--text)]"
+                          placeholder="Label"
+                        />
+                        <input
+                          type="url"
+                          value={l.url}
+                          onChange={(e) => updateLink(l.id, "url", e.target.value)}
+                          className="flex-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)] px-3 py-2 text-sm text-[var(--text)]"
+                          placeholder="https://..."
+                        />
+                        <button type="button" onClick={() => removeLink(l.id)} className="p-2 rounded text-[var(--text-muted)] hover:bg-red-500/20 hover:text-red-400">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className={labelClass}>Files (logo, brand guide, etc.)</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={onFileSelect}
+                  className="hidden"
+                />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const files = e.dataTransfer?.files;
+                    if (files?.length) setPendingFiles((prev) => [...prev, ...Array.from(files)]);
+                  }}
+                  className="border-2 border-dashed border-[var(--border)] rounded-xl p-6 text-center cursor-pointer hover:border-[var(--accent)]/50 hover:bg-[var(--bg-elevated)]/50 transition-colors"
+                >
+                  <Upload className="h-8 w-8 mx-auto text-[var(--text-muted)] mb-2" />
+                  <p className="text-sm text-[var(--text-muted)]">Drag & drop or click to browse</p>
+                </div>
+                {pendingFiles.length > 0 && (
+                  <ul className="mt-2 space-y-1.5">
+                    {pendingFiles.map((file, i) => (
+                      <li key={i} className="flex items-center justify-between text-sm py-1.5 px-2 rounded bg-[var(--bg-elevated)]">
+                        <span className="truncate text-[var(--text)]">{file.name}</span>
+                        <span className="text-[var(--text-muted)] shrink-0 ml-2">{formatBytes(file.size)}</span>
+                        <button type="button" onClick={() => removePendingFile(i)} className="p-1 rounded text-[var(--text-muted)] hover:text-red-400">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 pt-4 border-t border-[var(--border)]">
             <button
               type="button"
@@ -343,18 +514,15 @@ export function NewClientModal({
               Cancel
             </button>
             {step === 1 ? (
-              <button
-                type="submit"
-                className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-              >
+              <button type="submit" className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]">
                 Next: Services
               </button>
+            ) : step === 2 ? (
+              <button type="submit" className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]">
+                Next: Brief & Creatives
+              </button>
             ) : (
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
-              >
+              <button type="submit" disabled={loading} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50">
                 {loading ? "Creating…" : "Create Client"}
               </button>
             )}

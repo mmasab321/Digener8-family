@@ -53,6 +53,8 @@ export async function POST(req: Request) {
     managerId,
     notes,
     services: servicesPayload,
+    briefText,
+    links: linksPayload,
   } = body;
 
   if (!name?.trim()) return NextResponse.json({ error: "Name required" }, { status: 400 });
@@ -91,6 +93,28 @@ export async function POST(req: Request) {
         status: "Active",
       },
     });
+  }
+
+  const hasBrief = briefText != null || (Array.isArray(linksPayload) && linksPayload.length > 0);
+  if (hasBrief) {
+    const brief = await prisma.clientBrief.create({
+      data: {
+        clientId: client.id,
+        briefText: typeof briefText === "string" ? briefText.trim() || null : null,
+      },
+    });
+    const links = Array.isArray(linksPayload) ? linksPayload : [];
+    for (const l of links) {
+      const url = typeof l?.url === "string" ? l.url.trim() : "";
+      if (!url) continue;
+      await prisma.clientLink.create({
+        data: {
+          briefId: brief.id,
+          label: typeof l.label === "string" ? l.label.trim() || null : null,
+          url,
+        },
+      });
+    }
   }
 
   const withServices = await prisma.client.findUnique({

@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Download } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "@/lib/media/upload";
 import { EditClientModal } from "./EditClientModal";
 import { AddServiceModal } from "./AddServiceModal";
 import { EditClientServiceModal } from "./EditClientServiceModal";
@@ -39,6 +40,22 @@ type ClientData = {
   services: ClientServiceRow[];
 };
 
+type BriefAsset = {
+  id: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  createdAt: string;
+  uploadedBy: { id: string; name: string | null; email: string } | null;
+};
+
+type BriefData = {
+  id: string;
+  briefText: string | null;
+  links: { id: string; label: string | null; url: string }[];
+  assets: BriefAsset[];
+} | null;
+
 export function ClientDetailView({
   client: initialClient,
   isAdmin,
@@ -51,7 +68,26 @@ export function ClientDetailView({
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [editingService, setEditingService] = useState<ClientServiceRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [brief, setBrief] = useState<BriefData>(null);
+  const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
   const router = useRouter();
+
+  const refreshBrief = useCallback(async () => {
+    const res = await fetch(`/api/clients/${initialClient.id}/brief`);
+    if (res.ok) {
+      const data = await res.json();
+      setBrief({
+        id: data?.id ?? "",
+        briefText: data?.briefText ?? null,
+        links: Array.isArray(data?.links) ? data.links : [],
+        assets: Array.isArray(data?.assets) ? data.assets : [],
+      });
+    } else setBrief(null);
+  }, [initialClient.id]);
+
+  useEffect(() => {
+    refreshBrief();
+  }, [refreshBrief]);
 
   const refreshClient = useCallback(async () => {
     const res = await fetch(`/api/clients/${initialClient.id}`);
@@ -297,6 +333,87 @@ export function ClientDetailView({
                   </div>
                 </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Brief & Creatives */}
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
+        <h2 className="text-sm font-semibold text-[var(--text)] mb-3">Brief & Creatives</h2>
+        {brief === null ? (
+          <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+        ) : !brief.briefText && (!brief.links || brief.links.length === 0) && (!brief.assets || brief.assets.length === 0) ? (
+          <p className="text-sm text-[var(--text-muted)]">No brief, links, or files yet.</p>
+        ) : (
+          <div className="space-y-4">
+            {brief.briefText && (
+              <div>
+                <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">Brief</h3>
+                <p className="text-sm text-[var(--text)] whitespace-pre-wrap">{brief.briefText}</p>
+              </div>
+            )}
+            {brief.links && brief.links.length > 0 && (
+              <div>
+                <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Reference links</h3>
+                <ul className="space-y-1.5">
+                  {brief.links.map((l) => (
+                    <li key={l.id}>
+                      <a href={l.url.startsWith("http") ? l.url : `https://${l.url}`} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--accent)] hover:underline">
+                        {l.label?.trim() || l.url}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {brief.assets && brief.assets.length > 0 && (
+              <div>
+                <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Files</h3>
+                <ul className="space-y-2">
+                  {brief.assets.map((a) => (
+                    <li key={a.id} className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-[var(--bg-elevated)]">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--text)] truncate">{a.fileName}</p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {a.sizeBytes != null ? formatBytes(a.sizeBytes) : "—"} · {a.uploadedBy?.name || a.uploadedBy?.email || "—"} · {formatDate(a.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <a
+                          href="#"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            const res = await fetch(`/api/client-assets/${a.id}/download`);
+                            if (!res.ok) return;
+                            const { url } = await res.json();
+                            window.open(url, "_blank");
+                          }}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1.5 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10"
+                        >
+                          <Download className="h-4 w-4" /> Download
+                        </a>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!confirm("Delete this file?")) return;
+                              setDeletingAssetId(a.id);
+                              const res = await fetch(`/api/client-assets/${a.id}`, { method: "DELETE" });
+                              setDeletingAssetId(null);
+                              if (res.ok) refreshBrief();
+                            }}
+                            disabled={deletingAssetId === a.id}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1.5 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </div>
