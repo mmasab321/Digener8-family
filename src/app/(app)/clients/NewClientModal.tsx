@@ -23,8 +23,14 @@ function putFile(file: File, uploadUrl: string, contentType: string): Promise<vo
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", uploadUrl);
     if (contentType) xhr.setRequestHeader("Content-Type", contentType);
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Upload failed")));
-    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      const msg = xhr.status === 0
+        ? "Upload failed (blocked or network error). If using Wasabi/S3, add CORS to your bucket: allow your site origin and method PUT."
+        : `Upload failed (status ${xhr.status}).`;
+      reject(new Error(msg));
+    };
+    xhr.onerror = () => reject(new Error("Upload failed (network error). If using Wasabi/S3, add CORS to your bucket: allow your site origin and method PUT."));
     xhr.send(file);
   });
 }
@@ -489,7 +495,7 @@ export function NewClientModal({
                 >
                   <Upload className="h-8 w-8 mx-auto text-[var(--text-muted)] mb-2" />
                   <p className="text-sm text-[var(--text-muted)]">Drag & drop or click to browse</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">Files upload when you click Create Client. Allowed: images (PNG, JPEG, WebP), PDF, MP4.</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Files upload when you click Create Client. Most file types allowed (images, PDF, video, docs, zip). If upload fails, check Wasabi CORS (see docs/wasabi-cors.md).</p>
                 </div>
                 {pendingFiles.length > 0 && (
                   <ul className="mt-2 space-y-1.5">

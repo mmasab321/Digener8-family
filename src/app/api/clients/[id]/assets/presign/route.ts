@@ -5,7 +5,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { s3Client, WASABI_BUCKET } from "@/lib/storage/s3Client";
-import { UPLOAD_MAX_BYTES, isAllowedMime } from "@/lib/storage/config";
+import { UPLOAD_MAX_BYTES, isAllowedMimeForClientAsset } from "@/lib/storage/config";
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200) || "file";
@@ -35,7 +35,7 @@ export async function POST(
   if (!fileName) return NextResponse.json({ error: "fileName required" }, { status: 400 });
   if (Number.isNaN(sizeBytes) || sizeBytes < 0) return NextResponse.json({ error: "sizeBytes required" }, { status: 400 });
   if (sizeBytes > UPLOAD_MAX_BYTES) return NextResponse.json({ error: `File too large. Max ${UPLOAD_MAX_BYTES / 1024 / 1024}MB` }, { status: 400 });
-  if (!isAllowedMime(mimeType)) return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
+  if (!isAllowedMimeForClientAsset(mimeType)) return NextResponse.json({ error: "File type not allowed for client assets" }, { status: 400 });
 
   if (!WASABI_BUCKET) return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
 

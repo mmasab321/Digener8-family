@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { UPLOAD_MAX_BYTES, isAllowedMime } from "@/lib/storage/config";
+import { UPLOAD_MAX_BYTES, isAllowedMimeForClientAsset } from "@/lib/storage/config";
 
 export async function POST(
   req: Request,
@@ -31,7 +31,7 @@ export async function POST(
   const mime = typeof mimeType === "string" ? mimeType : "application/octet-stream";
   const size = typeof sizeBytes === "number" ? sizeBytes : parseInt(String(sizeBytes), 10);
   if (Number.isNaN(size) || size < 0) return NextResponse.json({ error: "sizeBytes required" }, { status: 400 });
-  if (size > UPLOAD_MAX_BYTES || !isAllowedMime(mime)) return NextResponse.json({ error: "Invalid file" }, { status: 400 });
+  if (size > UPLOAD_MAX_BYTES || !isAllowedMimeForClientAsset(mime)) return NextResponse.json({ error: "Invalid file" }, { status: 400 });
 
   if (!storageKey.startsWith(`clients/${clientId}/`)) return NextResponse.json({ error: "Invalid storageKey" }, { status: 400 });
 
