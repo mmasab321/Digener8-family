@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { formatBytes, uploadToWasabiOnly } from "@/lib/media/upload";
 
@@ -44,6 +45,8 @@ export function NewClientModal({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [selectedServices, setSelectedServices] = useState<Record<string, SelectedService>>({});
@@ -93,7 +96,7 @@ export function NewClientModal({
     const files = e.target.files;
     if (!files?.length) return;
     setPendingFiles((prev) => [...prev, ...Array.from(files)]);
-    e.target.value = "";
+    e.target.value = ""; // allow selecting same file again
   };
   const removePendingFile = (index: number) => setPendingFiles((prev) => prev.filter((_, i) => i !== index));
 
@@ -143,9 +146,12 @@ export function NewClientModal({
     }
     const client = await res.json();
     const clientId = client?.id;
-    if (clientId && pendingFiles.length > 0) {
-      for (const file of pendingFiles) {
+    const totalFiles = pendingFiles.length;
+    if (clientId && totalFiles > 0) {
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const file = pendingFiles[i];
         try {
+          setUploadStatus(`Uploading ${i + 1}/${totalFiles}…`);
           const pending = await uploadToWasabiOnly(file);
           const confirmRes = await fetch(`/api/clients/${clientId}/assets/confirm`, {
             method: "POST",
@@ -160,14 +166,17 @@ export function NewClientModal({
           const confirmData = await confirmRes.json().catch(() => ({}));
           if (!confirmRes.ok) throw new Error(confirmData.error || "Save file failed");
         } catch (err) {
+          setUploadStatus(null);
           setError(err instanceof Error ? err.message : "File upload failed");
           setLoading(false);
           return;
         }
       }
+      setUploadStatus(null);
     }
     setLoading(false);
     onCreated();
+    if (clientId) router.push(`/clients/${clientId}`);
   };
 
   const inputClass =
@@ -445,16 +454,25 @@ export function NewClientModal({
                 )}
               </div>
               <div>
-                <label className={labelClass}>Files (logo, brand guide, etc.)</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className={labelClass}>Files (logo, brand guide, etc.)</label>
+                  {pendingFiles.length > 0 && (
+                    <span className="text-xs font-medium text-[var(--accent)]">{pendingFiles.length} file(s) ready — will upload on Create Client</span>
+                  )}
+                </div>
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
+                  accept=".png,.jpg,.jpeg,.webp,.pdf,.mp4"
                   onChange={onFileSelect}
                   className="hidden"
                 />
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -466,7 +484,7 @@ export function NewClientModal({
                 >
                   <Upload className="h-8 w-8 mx-auto text-[var(--text-muted)] mb-2" />
                   <p className="text-sm text-[var(--text-muted)]">Drag & drop or click to browse</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">Files upload when you click Create Client. Same as Communication: images (PNG, JPEG, WebP), PDF, MP4.</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">PNG, JPEG, WebP, PDF, MP4 (same as Communication)</p>
                 </div>
                 {pendingFiles.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
@@ -503,7 +521,7 @@ export function NewClientModal({
               </button>
             ) : (
               <button type="submit" disabled={loading} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50">
-                {loading ? "Creating…" : "Create Client"}
+                {loading ? (uploadStatus || "Creating…") : "Create Client"}
               </button>
             )}
           </div>
