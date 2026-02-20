@@ -903,20 +903,21 @@ function ChannelChat({
   const MAX_FILES_PER_UPLOAD = 10;
   const handleAttachFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
-    e.target.value = "";
     if (!fileList?.length || isAnnouncementOnly) return;
-    let files = Array.from(fileList);
+    const files = Array.from(fileList);
+    e.target.value = "";
+    let toUpload = files;
     if (files.length > MAX_FILES_PER_UPLOAD) {
       setUploadError(`Max ${MAX_FILES_PER_UPLOAD} files at a time. Uploading first ${MAX_FILES_PER_UPLOAD}.`);
-      files = files.slice(0, MAX_FILES_PER_UPLOAD);
+      toUpload = files.slice(0, MAX_FILES_PER_UPLOAD);
     }
     setUploadError(null);
     setUploadingFile(true);
-    if (files.length === 1) {
+    if (toUpload.length === 1) {
       setUploadProgress(0);
       setUploadFileCount(null);
       try {
-        const pending = await uploadToWasabiOnly(files[0], (p) => setUploadProgress(p));
+        const pending = await uploadToWasabiOnly(toUpload[0], (p) => setUploadProgress(p));
         setPendingAttachments((prev) => {
           const next = [...prev, pending];
           pendingAttachmentsRef.current = next;
@@ -931,11 +932,11 @@ function ChannelChat({
       }
       return;
     }
-    setUploadFileCount(files.length);
+    setUploadFileCount(toUpload.length);
     setUploadProgress(null);
     try {
       const pendings = await Promise.all(
-        files.map((file) => uploadToWasabiOnly(file, () => {}))
+        toUpload.map((file) => uploadToWasabiOnly(file, () => {}))
       );
       setPendingAttachments((prev) => {
         const next = [...prev, ...pendings];
@@ -1152,23 +1153,27 @@ function ChannelChat({
               )}
               <div className="flex gap-2">
                 <input
+                  id="channel-file-input"
                   ref={fileInputRef}
                   type="file"
                   accept={CHAT_ACCEPT}
                   multiple
-                  className="hidden"
+                  className="sr-only"
                   onChange={handleAttachFile}
                   disabled={uploadingFile}
+                  aria-label="Attach files"
                 />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingFile}
-                  className="p-2 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-white shrink-0"
+                <label
+                  htmlFor="channel-file-input"
+                  className={`p-2 rounded-lg border border-[var(--border)] shrink-0 flex items-center justify-center cursor-pointer ${
+                    uploadingFile
+                      ? "opacity-50 pointer-events-none"
+                      : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-white"
+                  }`}
                   title="Attach file(s) — select multiple to upload together"
                 >
                   <Paperclip className="h-5 w-5" />
-                </button>
+                </label>
                 {uploadingFile && uploadProgress != null && (
                   <span className="text-sm text-[var(--text-muted)] self-center">
                     Uploading… {uploadProgress}%
