@@ -753,6 +753,8 @@ function ChannelChat({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const userNearBottomRef = useRef(true);
 
   type MessageType = {
     id: string;
@@ -792,6 +794,7 @@ function ChannelChat({
 
   useEffect(() => {
     if (!channel.id) return;
+    userNearBottomRef.current = true;
     setLoading(true);
     Promise.all([
       fetch(`/api/channels/${channel.id}/messages`).then((r) => r.json()),
@@ -856,8 +859,16 @@ function ChannelChat({
   }, [channel.id, currentUser?.name, currentUser?.email]);
 
   useEffect(() => {
+    if (!userNearBottomRef.current) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const onMessagesScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const threshold = 150;
+    userNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+  };
 
   const sendMessage = async () => {
     if (isAnnouncementOnly) return;
@@ -890,6 +901,7 @@ function ChannelChat({
           setUploadError(errMsg);
         }
       }
+      userNearBottomRef.current = true;
       setMessages((prev) => [...prev, { ...msg, attachments: confirmed, parentId: parentIdToSend ?? null }]);
       setPendingAttachments([]);
       pendingAttachmentsRef.current = [];
@@ -1032,7 +1044,11 @@ function ChannelChat({
 
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto px-4 py-3 space-y-4"
+            onScroll={onMessagesScroll}
+          >
             {loading && <p className="text-sm text-[var(--text-muted)]">Loading…</p>}
             {!loading && messages.length === 0 && (
               <p className="text-sm text-[var(--text-muted)]">No activity yet. Start the conversation.</p>
@@ -1608,10 +1624,13 @@ function DMChat({
   } | null>(null);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const userNearBottomRef = useRef(true);
   const notifiedDmIdsRef = useRef<Set<string>>(new Set());
   const initialDmMessageIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    userNearBottomRef.current = true;
     fetch(`/api/dms/${dmId}`)
       .then((r) => r.json())
       .then((data: { otherUser: User | null; messages: { id: string; content: string; createdAt: Date; sender: User | null }[] }) => {
@@ -1647,8 +1666,16 @@ function DMChat({
   }, [dmId, currentUser?.id]);
 
   useEffect(() => {
+    if (!userNearBottomRef.current) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [dm?.messages]);
+
+  const onDmScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const threshold = 150;
+    userNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+  };
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -1659,6 +1686,7 @@ function DMChat({
     });
     if (!res.ok) return;
     const msg = await res.json();
+    userNearBottomRef.current = true;
     setDm((prev) =>
       prev ? { ...prev, messages: [...prev.messages, msg] } : { otherUser: null, messages: [msg] }
     );
@@ -1675,7 +1703,11 @@ function DMChat({
         <MessageCircle className="h-5 w-5 text-[var(--text-muted)]" />
         <h1 className="font-semibold text-white">{other?.name || other?.email || "Direct message"}</h1>
       </header>
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
+        onScroll={onDmScroll}
+      >
         {dm.messages.map((m) => (
           <div
             key={m.id}
