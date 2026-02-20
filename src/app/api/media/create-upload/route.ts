@@ -10,13 +10,15 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200) || "file";
 }
 
-function buildStorageKey(userId: string, fileName: string): string {
+const ALLOWED_FOLDERS = ["uploads", "client-assets"] as const;
+
+function buildStorageKey(userId: string, fileName: string, folder: "uploads" | "client-assets" = "uploads"): string {
   const now = new Date();
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   const safe = sanitizeFileName(fileName);
-  return `uploads/${userId}/${yyyy}/${mm}/${suffix}-${safe}`;
+  return `${folder}/${userId}/${yyyy}/${mm}/${suffix}-${safe}`;
 }
 
 export async function POST(req: Request) {
@@ -26,7 +28,9 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const { fileName, mimeType, sizeBytes, attachTo } = body;
+  const { fileName, mimeType, sizeBytes, attachTo, folder: folderParam } = body;
+  const folder =
+    ALLOWED_FOLDERS.includes(folderParam) ? folderParam : "uploads";
 
   if (!fileName || typeof fileName !== "string")
     return NextResponse.json({ error: "fileName required" }, { status: 400 });
@@ -49,7 +53,7 @@ export async function POST(req: Request) {
   if (!WASABI_BUCKET)
     return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
 
-  const storageKey = buildStorageKey(userId, fileName);
+  const storageKey = buildStorageKey(userId, fileName, folder);
 
   const command = new PutObjectCommand({
     Bucket: WASABI_BUCKET,

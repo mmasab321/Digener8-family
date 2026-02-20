@@ -22,7 +22,8 @@ export type PendingAttachment = {
 
 async function createUpload(
   file: File,
-  attachTo: AttachTo | null
+  attachTo: AttachTo | null,
+  folder?: "uploads" | "client-assets"
 ): Promise<{ uploadUrl: string; storageKey: string; headers: Record<string, string> }> {
   const res = await fetch("/api/media/create-upload", {
     method: "POST",
@@ -32,6 +33,7 @@ async function createUpload(
       mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,
       ...(attachTo ? { attachTo } : {}),
+      ...(folder ? { folder } : {}),
     }),
   });
   if (!res.ok) {
@@ -91,12 +93,14 @@ export async function uploadAndAttachToTask(
   );
 }
 
-/** For chat: upload to Wasabi only; call confirmAttachment after message is created. */
+/** For chat: upload to Wasabi only; call confirmAttachment after message is created.
+ *  For client briefs: pass folder "client-assets" to store under client-assets/ in Wasabi. */
 export async function uploadToWasabiOnly(
   file: File,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  folder?: "uploads" | "client-assets"
 ): Promise<PendingAttachment> {
-  const { uploadUrl, storageKey, headers } = await createUpload(file, null);
+  const { uploadUrl, storageKey, headers } = await createUpload(file, null, folder ?? "uploads");
   await putFile(file, uploadUrl, headers["Content-Type"], onProgress);
   return {
     storageKey,

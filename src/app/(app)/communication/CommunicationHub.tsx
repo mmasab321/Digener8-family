@@ -768,12 +768,17 @@ function ChannelChat({
   const [replyingTo, setReplyingTo] = useState<MessageType | null>(null);
 
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const pendingAttachmentsRef = useRef<PendingAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadFileCount, setUploadFileCount] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    pendingAttachmentsRef.current = pendingAttachments;
+  }, [pendingAttachments]);
   const channelOpenedAtRef = useRef<number>(0);
   const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
   const CHAT_ACCEPT = "image/png,image/jpeg,image/webp,video/mp4,application/pdf";
@@ -856,7 +861,8 @@ function ChannelChat({
 
   const sendMessage = async () => {
     if (isAnnouncementOnly) return;
-    if (!input.trim() && pendingAttachments.length === 0) return;
+    const attachmentsToSend = pendingAttachmentsRef.current;
+    if (!input.trim() && attachmentsToSend.length === 0) return;
     if (sendingMessage) return;
     setUploadError(null);
     setSendingMessage(true);
@@ -875,7 +881,7 @@ function ChannelChat({
       }
       const msg = data;
       const confirmed: { id: string; fileName: string; mimeType: string; sizeBytes: number }[] = [];
-      for (const p of pendingAttachments) {
+      for (const p of attachmentsToSend) {
         try {
           const m = await confirmAttachment(p, { type: "message", id: msg.id });
           confirmed.push(m);
@@ -886,6 +892,7 @@ function ChannelChat({
       }
       setMessages((prev) => [...prev, { ...msg, attachments: confirmed, parentId: parentIdToSend ?? null }]);
       setPendingAttachments([]);
+      pendingAttachmentsRef.current = [];
       setInput("");
       setReplyingTo(null);
     } finally {
@@ -910,7 +917,11 @@ function ChannelChat({
       setUploadFileCount(null);
       try {
         const pending = await uploadToWasabiOnly(files[0], (p) => setUploadProgress(p));
-        setPendingAttachments((prev) => [...prev, pending]);
+        setPendingAttachments((prev) => {
+          const next = [...prev, pending];
+          pendingAttachmentsRef.current = next;
+          return next;
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Upload failed";
         setUploadError(message);
@@ -926,7 +937,11 @@ function ChannelChat({
       const pendings = await Promise.all(
         files.map((file) => uploadToWasabiOnly(file, () => {}))
       );
-      setPendingAttachments((prev) => [...prev, ...pendings]);
+      setPendingAttachments((prev) => {
+        const next = [...prev, ...pendings];
+        pendingAttachmentsRef.current = next;
+        return next;
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setUploadError(message);
@@ -1108,7 +1123,13 @@ function ChannelChat({
                       {p.fileName} ({formatBytesMedia(p.sizeBytes)})
                       <button
                         type="button"
-                        onClick={() => setPendingAttachments((prev) => prev.filter((_, j) => j !== i))}
+                        onClick={() =>
+                          setPendingAttachments((prev) => {
+                            const next = prev.filter((_, j) => j !== i);
+                            pendingAttachmentsRef.current = next;
+                            return next;
+                          })
+                        }
                         className="p-0.5 rounded hover:bg-[var(--accent)]/20"
                       >
                         <X className="h-3.5 w-3.5" />

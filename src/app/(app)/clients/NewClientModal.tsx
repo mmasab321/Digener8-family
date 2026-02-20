@@ -168,7 +168,7 @@ export function NewClientModal({
         const file = filesToUpload[i];
         try {
           setUploadStatus(`Uploading ${i + 1}/${totalFiles}…`);
-          const pending = await uploadToWasabiOnly(file);
+          const pending = await uploadToWasabiOnly(file, undefined, "client-assets");
           const confirmRes = await fetch(`/api/clients/${clientId}/assets/confirm`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
