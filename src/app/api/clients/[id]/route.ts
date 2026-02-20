@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { deleteFromWasabi } from "@/lib/storage/s3Client";
 
 export async function GET(
   _req: Request,
@@ -71,6 +72,15 @@ export async function DELETE(
   if (role !== "Admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
 
+  const client = await prisma.client.findUnique({
+    where: { id },
+    include: { brief: { include: { assets: { select: { storageKey: true } } } } },
+  });
+  if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  for (const asset of client.brief?.assets ?? []) {
+    await deleteFromWasabi(asset.storageKey);
+  }
   await prisma.client.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

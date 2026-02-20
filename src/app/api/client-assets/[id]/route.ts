@@ -1,9 +1,8 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { s3Client, WASABI_BUCKET } from "@/lib/storage/s3Client";
+import { deleteFromWasabi } from "@/lib/storage/s3Client";
 
 export async function DELETE(
   _req: Request,
@@ -21,16 +20,7 @@ export async function DELETE(
   });
   if (!asset) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (WASABI_BUCKET) {
-    try {
-      await s3Client.send(
-        new DeleteObjectCommand({ Bucket: WASABI_BUCKET, Key: asset.storageKey })
-      );
-    } catch (e) {
-      console.error("Wasabi delete error:", e);
-    }
-  }
-
+  await deleteFromWasabi(asset.storageKey);
   await prisma.clientAsset.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

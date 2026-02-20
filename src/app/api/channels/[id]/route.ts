@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { deleteFromWasabi } from "@/lib/storage/s3Client";
 
 export async function GET(
   _req: Request,
@@ -87,6 +88,17 @@ export async function DELETE(
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
+
+  const channel = await prisma.channel.findUnique({ where: { id } });
+  if (!channel) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const mediaList = await prisma.media.findMany({
+    where: { messageId: { not: null }, message: { channelId: id } },
+    select: { storageKey: true },
+  });
+  for (const m of mediaList) {
+    await deleteFromWasabi(m.storageKey);
+  }
   await prisma.channel.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }
