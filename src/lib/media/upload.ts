@@ -20,21 +20,30 @@ export type PendingAttachment = {
   sizeBytes: number;
 };
 
+export type UploadContext = {
+  folder?: "uploads" | "client-assets";
+  channelId?: string;
+  clientId?: string;
+};
+
 async function createUpload(
   file: File,
   attachTo: AttachTo | null,
-  folder?: "uploads" | "client-assets"
+  context?: UploadContext
 ): Promise<{ uploadUrl: string; storageKey: string; headers: Record<string, string> }> {
+  const body: Record<string, unknown> = {
+    fileName: file.name,
+    mimeType: file.type || "application/octet-stream",
+    sizeBytes: file.size,
+    ...(attachTo ? { attachTo } : {}),
+  };
+  if (context?.folder) body.folder = context.folder;
+  if (context?.channelId) body.channelId = context.channelId;
+  if (context?.clientId) body.clientId = context.clientId;
   const res = await fetch("/api/media/create-upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fileName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
-      ...(attachTo ? { attachTo } : {}),
-      ...(folder ? { folder } : {}),
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -85,7 +94,7 @@ export async function uploadAndAttachToTask(
   onProgress?: (percent: number) => void
 ): Promise<MediaDto> {
   const attachTo: AttachTo = { type: "task", id: taskId };
-  const { uploadUrl, storageKey, headers } = await createUpload(file, attachTo);
+  const { uploadUrl, storageKey, headers } = await createUpload(file, attachTo, { folder: "uploads" });
   await putFile(file, uploadUrl, headers["Content-Type"], onProgress);
   return confirmAttachment(
     { storageKey, fileName: file.name, mimeType: file.type || "application/octet-stream", sizeBytes: file.size },
@@ -94,13 +103,14 @@ export async function uploadAndAttachToTask(
 }
 
 /** For chat: upload to Wasabi only; call confirmAttachment after message is created.
- *  For client briefs: pass folder "client-assets" to store under client-assets/ in Wasabi. */
+ *  Pass context.channelId to store under channels/{channelSlug}/ in Wasabi.
+ *  For client briefs: pass context.folder "client-assets" (and optional context.clientId) to store under clients/ in Wasabi. */
 export async function uploadToWasabiOnly(
   file: File,
   onProgress?: (percent: number) => void,
-  folder?: "uploads" | "client-assets"
+  context?: UploadContext
 ): Promise<PendingAttachment> {
-  const { uploadUrl, storageKey, headers } = await createUpload(file, null, folder ?? "uploads");
+  const { uploadUrl, storageKey, headers } = await createUpload(file, null, context ?? { folder: "uploads" });
   await putFile(file, uploadUrl, headers["Content-Type"], onProgress);
   return {
     storageKey,

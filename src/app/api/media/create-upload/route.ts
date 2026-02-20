@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { authOptions } from "@/lib/auth";
+import { hasPermission } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { s3Client, WASABI_BUCKET } from "@/lib/storage/s3Client";
 import { UPLOAD_MAX_BYTES, isAllowedMime } from "@/lib/storage/config";
 
@@ -12,13 +14,13 @@ function sanitizeFileName(name: string): string {
 
 const ALLOWED_FOLDERS = ["uploads", "client-assets"] as const;
 
-function buildStorageKey(userId: string, fileName: string, folder: "uploads" | "client-assets" = "uploads"): string {
+function buildStorageKey(prefix: string, fileName: string): string {
   const now = new Date();
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   const safe = sanitizeFileName(fileName);
-  return `${folder}/${userId}/${yyyy}/${mm}/${suffix}-${safe}`;
+  return `${prefix}/${yyyy}/${mm}/${suffix}-${safe}`;
 }
 
 export async function POST(req: Request) {
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const { fileName, mimeType, sizeBytes, attachTo, folder: folderParam } = body;
+  const { fileName, mimeType, sizeBytes, attachTo, folder: folderParam, channelId, clientId } = body;
   const folder =
     ALLOWED_FOLDERS.includes(folderParam) ? folderParam : "uploads";
 
@@ -53,7 +55,33 @@ export async function POST(req: Request) {
   if (!WASABI_BUCKET)
     return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
 
-  const storageKey = buildStorageKey(userId, fileName, folder);
+  let prefix: string;
+  if (channelId && typeof channelId === "string") {
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { id: true, slug: true, name: true },
+    });
+    if (!channel) return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+    const member = await prisma.channelMember.findUnique({
+      where: { channelId_userId: { channelId, userId } },
+    });
+    if (!member && !hasPermission((session.user as { role?: string }).role ?? "", "admin:channels"))
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const slug = (channel.slug || channel.name || channel.id).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "channel";
+    prefix = `channels/${slug}`;
+  } else if (clientId && typeof clientId === "string") {
+    const role = (session.user as { role?: string }).role ?? "";
+    if (role !== "Admin" && role !== "Manager") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
+    if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    prefix = `clients/${clientId}`;
+  } else if (folder === "client-assets") {
+    prefix = `clients/onboarding/${userId}`;
+  } else {
+    prefix = `uploads/${userId}`;
+  }
+
+  const storageKey = buildStorageKey(prefix, fileName);
 
   const command = new PutObjectCommand({
     Bucket: WASABI_BUCKET,

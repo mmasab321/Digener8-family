@@ -929,7 +929,7 @@ function ChannelChat({
       setUploadProgress(0);
       setUploadFileCount(null);
       try {
-        const pending = await uploadToWasabiOnly(toUpload[0], (p) => setUploadProgress(p));
+        const pending = await uploadToWasabiOnly(toUpload[0], (p) => setUploadProgress(p), { channelId: channel.id });
         setPendingAttachments((prev) => {
           const next = [...prev, pending];
           pendingAttachmentsRef.current = next;
@@ -948,7 +948,7 @@ function ChannelChat({
     setUploadProgress(null);
     try {
       const pendings = await Promise.all(
-        toUpload.map((file) => uploadToWasabiOnly(file, () => {}))
+        toUpload.map((file) => uploadToWasabiOnly(file, () => {}, { channelId: channel.id }))
       );
       setPendingAttachments((prev) => {
         const next = [...prev, ...pendings];
