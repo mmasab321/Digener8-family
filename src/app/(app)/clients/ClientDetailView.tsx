@@ -7,6 +7,7 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/media/upload";
 import { EditClientModal } from "./EditClientModal";
+import { EditBriefModal } from "./EditBriefModal";
 import { AddServiceModal } from "./AddServiceModal";
 import { EditClientServiceModal } from "./EditClientServiceModal";
 
@@ -59,18 +60,22 @@ type BriefData = {
 export function ClientDetailView({
   client: initialClient,
   isAdmin,
+  canEditBrief,
 }: {
   client: ClientData;
   isAdmin: boolean;
+  canEditBrief?: boolean;
 }) {
   const [client, setClient] = useState<ClientData>(initialClient);
   const [editClientOpen, setEditClientOpen] = useState(false);
+  const [editBriefOpen, setEditBriefOpen] = useState(false);
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [editingService, setEditingService] = useState<ClientServiceRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [brief, setBrief] = useState<BriefData>(null);
   const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
   const router = useRouter();
+  const showEditBrief = canEditBrief ?? isAdmin;
 
   const refreshBrief = useCallback(async () => {
     const res = await fetch(`/api/clients/${initialClient.id}/brief`);
@@ -339,7 +344,18 @@ export function ClientDetailView({
 
       {/* Brief & Creatives */}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
-        <h2 className="text-sm font-semibold text-[var(--text)] mb-3">Brief & Creatives</h2>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-sm font-semibold text-[var(--text)]">Brief & Creatives</h2>
+          {showEditBrief && (
+            <button
+              type="button"
+              onClick={() => setEditBriefOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text)]"
+            >
+              <Pencil className="h-4 w-4" /> Edit
+            </button>
+          )}
+        </div>
         {brief === null ? (
           <p className="text-sm text-[var(--text-muted)]">Loading…</p>
         ) : !brief.briefText && (!brief.links || brief.links.length === 0) && (!brief.assets || brief.assets.length === 0) ? (
@@ -434,6 +450,17 @@ export function ClientDetailView({
           onSaved={() => {
             setEditClientOpen(false);
             refreshClient();
+          }}
+        />
+      )}
+      {editBriefOpen && (
+        <EditBriefModal
+          clientId={client.id}
+          initialBrief={brief}
+          onClose={() => setEditBriefOpen(false)}
+          onSaved={() => {
+            setEditBriefOpen(false);
+            refreshBrief();
           }}
         />
       )}

@@ -33,6 +33,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   const role = (session.user as { role?: string }).role ?? "";
   const isAdmin = role === "Admin";
+  const canEditBrief = role === "Admin" || role === "Manager";
 
   const clientJson = JSON.parse(JSON.stringify(client));
 
@@ -44,7 +45,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       >
         <ArrowLeft className="h-4 w-4" /> Back to Clients
       </Link>
-      <ClientDetailView client={clientJson} isAdmin={isAdmin} />
+      <ClientDetailView client={clientJson} isAdmin={isAdmin} canEditBrief={canEditBrief} />
     </div>
   );
 }
