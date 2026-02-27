@@ -1,7 +1,7 @@
 const allowedMimeEnv = process.env.UPLOAD_ALLOWED_MIME ?? "image/png,image/jpeg,image/webp,video/mp4,application/pdf";
-const maxBytes = parseInt(process.env.UPLOAD_MAX_BYTES ?? "1073741824", 10); // 1GB
+const maxBytes = parseInt(process.env.UPLOAD_MAX_BYTES ?? "5368709120", 10); // 5GB
 
-export const UPLOAD_MAX_BYTES = Number.isNaN(maxBytes) ? 1073741824 : maxBytes;
+export const UPLOAD_MAX_BYTES = Number.isNaN(maxBytes) ? 5368709120 : maxBytes;
 export const UPLOAD_ALLOWED_MIME = new Set(
   allowedMimeEnv.split(",").map((s) => s.trim()).filter(Boolean)
 );
