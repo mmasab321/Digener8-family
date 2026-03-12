@@ -13,7 +13,7 @@ Internal web-based operating system for Degener8. Category-driven, modular, and 
 - **SOP Vault**: Documents with title, category, author, tags, rich text (markdown). Search and filter.
 - **Settings (Admin)**: Manage users (assign role), create/edit categories. Metrics and pipelines are managed from their own modules.
 
-## Tech Stack
+## Tech Stackk
 
 - Next.js 15 (App Router), React 19, TypeScript
 - Tailwind CSS, dark theme
